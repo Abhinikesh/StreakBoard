@@ -115,3 +115,37 @@ export const getMe = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+// ── PUT /api/auth/me ─────────────────────────────────────────
+/**
+ * Protected route — updates the currently authenticated user's profile.
+ */
+export const updateMe = async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { name: name.trim() },
+      { new: true }
+    ).select("-password -__v");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+    });
+  } catch (err) {
+    console.error("[updateMe]", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

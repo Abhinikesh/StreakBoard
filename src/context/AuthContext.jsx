@@ -55,8 +55,15 @@ export function AuthProvider({ children }) {
     navigate('/login');
   }, [navigate]);
 
+  /**
+   * updateUser(updatedFields) — merges updated fields into current user state
+   */
+  const updateUser = useCallback((updatedFields) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,6 +6,7 @@ import {
   verifyOTPLogin,
   googleCallback,
   getMe,
+  updateMe,
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -37,5 +38,8 @@ router.get(
 // ── Protected ─────────────────────────────────────────────────
 // GET /api/auth/me
 router.get("/me", authMiddleware, getMe);
+
+// PUT /api/auth/me
+router.put("/me", authMiddleware, updateMe);
 
 export default router;
