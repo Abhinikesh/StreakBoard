@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import api from '../api/axios';
-import Spinner from '../ui/Spinner';
-import AddHabitModal from '../habits/AddHabitModal';
-import { useAuth } from '../../context/AuthContext';
+import Navbar from '../components/layout/Navbar';
+import Spinner from '../components/ui/Spinner';
+import AddHabitModal from '../components/habits/AddHabitModal';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
   const { user, login, token, logout } = useAuth();

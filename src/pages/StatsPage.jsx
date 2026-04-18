@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/axios';
-import Navbar from '../layout/Navbar';
-import Spinner from '../ui/Spinner';
-import { getTodayString } from '../../utils/dateUtils';
+import Navbar from '../components/layout/Navbar';
+import Spinner from '../components/ui/Spinner';
+import { getTodayString } from '../utils/dateUtils';
 
 // Helper: Streak calculations fully on frontend parsing ISO Strings
 const calculateCurrentStreak = (logsObjArr) => {

@@ -2,19 +2,17 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import api from '../../api/axios';
-import Navbar from '../layout/Navbar';
-import HabitCard from '../habits/HabitCard';
-import AddHabitModal from '../habits/AddHabitModal';
-import { getTodayString } from '../../utils/dateUtils';
-import { useAuth } from '../../context/AuthContext';
+import api from '../api/axios';
+import Navbar from '../components/layout/Navbar';
+import HabitCard from '../components/habits/HabitCard';
+import AddHabitModal from '../components/habits/AddHabitModal';
+import { getTodayString } from '../utils/dateUtils';
+import { useAuth } from '../context/AuthContext';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loadingHabitId, setLoadingHabitId] = useState(null);
-
   const [loadingHabitId, setLoadingHabitId] = useState(null);
 
   // Queries
