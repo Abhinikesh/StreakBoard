@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
-import Spinner from '../ui/Spinner';
+import { useAuth } from '../context/AuthContext';
+import Spinner from '../components/ui/Spinner';
 
 export default function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
