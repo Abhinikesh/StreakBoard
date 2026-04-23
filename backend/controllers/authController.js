@@ -83,7 +83,7 @@ export const googleCallback = async (req, res) => {
 
     const token = generateToken({ id: _id, email });
 
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const clientUrl = process.env.CLIENT_URL || "https://streak-o.vercel.app";
     return res.redirect(`${clientUrl}/auth/callback?token=${token}`);
   } catch (err) {
     console.error("[googleCallback]", err);

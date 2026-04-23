@@ -10,7 +10,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${process.env.BACKEND_URL || 'https://streakboard.onrender.com'}/api/auth/google/callback`,
+      callbackURL: 'https://streakboard.onrender.com/api/auth/google/callback',
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {

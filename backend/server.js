@@ -24,6 +24,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
+      'https://streak-o.vercel.app',
       'http://localhost:5173',
       process.env.CLIENT_URL,
     ].filter(Boolean),
