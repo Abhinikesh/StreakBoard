@@ -13,4 +13,7 @@ export default defineConfig({
       'Service-Worker-Allowed': '/',
     },
   },
+  build: {
+    outDir: 'dist',
+  },
 })
