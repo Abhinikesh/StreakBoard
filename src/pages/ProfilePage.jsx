@@ -295,6 +295,68 @@ export default function ProfilePage() {
         </section>
 
         {/* ──────────────────────────────────────────────────────────────────── */}
+        {/* SECTION — Achievements                                              */}
+        {/* ──────────────────────────────────────────────────────────────────── */}
+        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <h2 className="text-base font-bold mb-4 pb-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+            <span>🏆</span> Achievements
+          </h2>
+
+          {habitsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map(i => (
+                <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : (() => {
+            const badgeHabits = habits.filter(h => h.badges?.some(b => b.type === '100_day_streak'));
+            if (badgeHabits.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="text-5xl mb-3 grayscale opacity-40">🏆</div>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No badges yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Complete a 100-day streak to earn your first badge 🔥
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-3">
+                {badgeHabits.map(habit => {
+                  const badge = habit.badges.find(b => b.type === '100_day_streak');
+                  const earnedDate = badge?.earnedAt
+                    ? new Date(badge.earnedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                    : '';
+                  return (
+                    <div
+                      key={habit._id}
+                      className="flex items-center gap-4 px-4 py-3 rounded-xl border border-yellow-200 dark:border-yellow-500/30 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/10 shadow-sm"
+                      style={{ borderLeft: '4px solid #facc15' }}
+                    >
+                      <div className="text-3xl w-10 h-10 flex items-center justify-center bg-white dark:bg-gray-700 rounded-full shadow-sm shrink-0">
+                        🏆
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          {habit.icon || '🎯'} {habit.name}
+                        </p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400 font-semibold mt-0.5">
+                          100-Day Streak Badge{earnedDate ? ` · Earned ${earnedDate}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-700">
+                        🔥 100
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </section>
+
+        {/* ──────────────────────────────────────────────────────────────────── */}
         {/* SECTION 3 — Public Link                                             */}
         {/* ──────────────────────────────────────────────────────────────────── */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">

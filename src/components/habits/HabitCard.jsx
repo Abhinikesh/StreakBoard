@@ -64,6 +64,7 @@ export default function HabitCard({ habit, todayLog, allLogs = [], onLog, isUpda
 
   const isDone = todayStatus === 'done';
   const isMissed = todayStatus === 'missed';
+  const is100Day = !!(habit.badges?.some(b => b.type === '100_day_streak'));
 
   const cardBg = isDone
     ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border-l-4 border-l-green-500 dark:border-l-green-700'
@@ -86,9 +87,20 @@ export default function HabitCard({ habit, todayLog, allLogs = [], onLog, isUpda
 
   return (
     <div
-      className={`rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border border-gray-100 dark:border-gray-700 overflow-hidden ${cardBg}`}
+      className={`relative rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border border-gray-100 dark:border-gray-700 overflow-hidden ${cardBg} ${
+        is100Day ? 'ring-2 ring-yellow-400 dark:ring-yellow-500 shadow-[0_0_20px_rgba(250,204,21,0.25)]' : ''
+      }`}
       style={cardStyle}
     >
+      {/* 100-day badge icon */}
+      {is100Day && (
+        <span
+          className="absolute top-2 right-2 text-lg leading-none z-10 select-none"
+          title="100-day streak badge!"
+        >
+          🏆
+        </span>
+      )}
       {/* Main row */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center gap-3 min-w-0">

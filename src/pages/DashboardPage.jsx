@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -7,6 +7,7 @@ import Navbar from '../components/layout/Navbar';
 import HabitCard from '../components/habits/HabitCard';
 import AddHabitModal from '../components/habits/AddHabitModal';
 import WeeklyView from '../components/habits/WeeklyView';
+import StreakCelebrationModal from '../components/habits/StreakCelebrationModal';
 import { getTodayString } from '../utils/dateUtils';
 import { useAuth } from '../context/AuthContext';
 import { playDoneSound, playMissedSound, playAllDoneSound } from '../utils/soundEffects';
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadingHabitId, setLoadingHabitId] = useState(null);
+  const [celebrationHabit, setCelebrationHabit] = useState(null);
 
   const { data: habitsData = [], isLoading: habitsLoading } = useQuery({
     queryKey: ['habits'],
@@ -88,6 +90,23 @@ export default function DashboardPage() {
 
   const habits = Array.isArray(habitsData) ? habitsData : [];
   const logs = Array.isArray(logsData) ? logsData : [];
+
+  // ── Check for newly earned 100-day badges ─────────────────────
+  useEffect(() => {
+    if (!habits.length) return;
+    for (const habit of habits) {
+      const has100 = habit.badges?.some(b => b.type === '100_day_streak');
+      if (has100) {
+        const lsKey = `celebrated_${habit._id}`;
+        if (!localStorage.getItem(lsKey)) {
+          localStorage.setItem(lsKey, 'true');
+          setCelebrationHabit(habit);
+          break; // show one at a time
+        }
+      }
+    }
+  }, [habits]);
+
   const todayStr = getTodayString();
   const dateDisplay = format(new Date(), 'EEEE, MMMM d');
   const hour = new Date().getHours();
@@ -206,6 +225,12 @@ export default function DashboardPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultTrackingPeriod={Number(localStorage.getItem('defaultTrackingPeriod')) || 30}
+      />
+
+      {/* 100-day streak celebration — shows once per habit */}
+      <StreakCelebrationModal
+        habit={celebrationHabit}
+        onClose={() => setCelebrationHabit(null)}
       />
     </div>
   );

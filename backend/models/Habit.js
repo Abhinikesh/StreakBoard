@@ -32,6 +32,13 @@ const habitSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    badges: [
+      {
+        type:      { type: String, default: '100_day_streak' },
+        earnedAt:  { type: Date,   default: Date.now },
+        habitName: { type: String },
+      }
+    ],
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

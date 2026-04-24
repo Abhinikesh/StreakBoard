@@ -1,5 +1,28 @@
 import HabitLog from "../models/HabitLog.js";
+import Habit from "../models/Habit.js";
 import mongoose from "mongoose";
+
+// ── Helper: compute current streak for a habit from its logs ───
+async function computeStreak(habitId) {
+  const logs = await HabitLog.find({ habitId, status: 'done' }).select('date').lean();
+  const doneDates = new Set(logs.map(l => l.date));
+
+  const pad = n => String(n).padStart(2, '0');
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+  if (!doneDates.has(todayStr)) return 0;
+
+  let streak = 1;
+  const cur = new Date(today);
+  cur.setDate(cur.getDate() - 1);
+  while (true) {
+    const ds = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+    if (doneDates.has(ds)) { streak++; cur.setDate(cur.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
 
 // ── POST /api/logs ─────────────────────────────────────────────
 export const logHabit = async (req, res) => {
@@ -21,6 +44,22 @@ export const logHabit = async (req, res) => {
       { $set: setFields },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
+
+    // ── Badge: award 100-day streak badge if earned ──────────────
+    if (status === 'done') {
+      const streak = await computeStreak(habitId);
+      if (streak >= 100) {
+        const habit = await Habit.findOne({ _id: habitId, userId: req.user.id });
+        if (habit && !habit.badges.some(b => b.type === '100_day_streak')) {
+          habit.badges.push({
+            type: '100_day_streak',
+            earnedAt: new Date(),
+            habitName: habit.name,
+          });
+          await habit.save();
+        }
+      }
+    }
 
     return res.status(200).json(log);
   } catch (err) {
