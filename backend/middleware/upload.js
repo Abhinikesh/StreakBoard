@@ -18,9 +18,10 @@ const upload = multer({
 export const uploadToCloudinary = (buffer) => {
   return new Promise((resolve, reject) => {
     const base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
-    cloudinary.uploader.upload(
+    cloudinary.uploader.unsigned_upload(
       base64,
-      { folder: 'avatars', resource_type: 'auto' },
+      'ml_default',
+      { resource_type: 'auto' },
       (error, result) => {
         if (error) {
           console.log('=== CLOUDINARY UPLOAD ERROR ===');
