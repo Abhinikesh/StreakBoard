@@ -19,6 +19,7 @@ import PublicProfilePage from './pages/PublicProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import NotFoundPage from './pages/NotFoundPage';
 import FeedbackWidget from './components/FeedbackWidget';
+import ComingSoonAnnouncement from './components/ComingSoonAnnouncement';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <ComingSoonAnnouncement />
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <FeedbackWidget />
