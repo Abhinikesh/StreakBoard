@@ -37,7 +37,7 @@ app.use(passport.initialize());
 
 // ── Health check ───────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ message: "StreakBoard API is running 🚀" });
+  res.status(200).json({ status: "ok", message: "StreakBoard API is running!" });
 });
 
 // ── Routes ───────────────────────────────────────────────────
