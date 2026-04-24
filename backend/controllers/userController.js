@@ -13,6 +13,9 @@ export const getProfile = async (req, res) => {
 
 export const uploadAvatar = async (req, res) => {
   try {
+    console.log('=== UPLOAD REQUEST RECEIVED ===');
+    console.log('req.file exists:', !!req.file);
+    console.log('buffer size:', req.file?.buffer?.length ?? 'NO BUFFER');
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
     const result = await uploadToCloudinary(req.file.buffer);
     await User.findByIdAndUpdate(req.user.id, { avatar: result.secure_url });
