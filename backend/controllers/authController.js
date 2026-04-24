@@ -25,19 +25,25 @@ export const requestOTP = async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    // Find or create user (OTP users may not have a name yet)
-    let user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      const name = email.split("@")[0];
-      user = await User.create({
-        email: email.toLowerCase(),
+    const normalizedEmail = email.toLowerCase();
+
+    // Find existing user by email — could be a Google OAuth account, that's fine.
+    // We do NOT create a user here; creation happens in verifyOTPLogin on success.
+    // This prevents a duplicate-key crash when a Google user requests an OTP.
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (!existingUser) {
+      // Pre-create a shell so verifyOTP can find them, but only if truly new.
+      const name = normalizedEmail.split('@')[0];
+      await User.create({
+        email: normalizedEmail,
         name,
         isProfilePublic: true,
         shareCode: buildShareCode(name),
       });
     }
+    // If user already exists (Google or OTP), skip create — just send the OTP.
 
-    await sendOTPEmail(email.toLowerCase());
+    await sendOTPEmail(normalizedEmail);
 
     return res.status(200).json({ message: "OTP sent" });
   } catch (err) {
@@ -58,27 +64,32 @@ export const verifyOTPLogin = async (req, res) => {
       return res.status(400).json({ message: "Email and OTP are required" });
     }
 
-    const isValid = verifyOTP(email.toLowerCase(), String(otp));
+    const normalizedEmail = email.toLowerCase();
+    const isValid = verifyOTP(normalizedEmail, String(otp));
 
     if (!isValid) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    // Fetch or create user
-    let user = await User.findOne({ email: email.toLowerCase() });
+    // Always look up by email first — one email = one account, regardless of login method.
+    // This handles the case where the user originally signed up with Google OAuth.
+    let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      const name = email.split("@")[0];
+      // Truly new user — create their account now.
+      const name = normalizedEmail.split('@')[0];
       user = await User.create({
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         name,
         isProfilePublic: true,
         shareCode: buildShareCode(name),
       });
     } else if (!user.shareCode) {
-      // Backfill shareCode for existing users that were created before this feature
+      // Backfill shareCode for legacy users created before this feature.
       user.shareCode = buildShareCode(user.name || user.email);
       await user.save();
     }
+    // If user exists with a googleId — that's fine, we just issue them a JWT.
+    // No duplicate account is created.
 
     const token = generateToken({ id: user._id, email: user.email });
 
