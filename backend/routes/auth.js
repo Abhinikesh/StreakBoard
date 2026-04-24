@@ -28,10 +28,21 @@ router.get(
 // GET /api/auth/google/callback  → Google redirects back here
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: `${process.env.CLIENT_URL || "https://streak-o.vercel.app"}/login?error=oauth_failed`,
-  }),
+  (req, res, next) => {
+    passport.authenticate("google", { session: false }, (err, user, info) => {
+      if (err) {
+        console.error("[Google OAuth Error]:", err);
+        const clientUrl = process.env.CLIENT_URL || "https://streak-o.vercel.app";
+        return res.redirect(`${clientUrl}/login?error=oauth_server_error`);
+      }
+      if (!user) {
+        const clientUrl = process.env.CLIENT_URL || "https://streak-o.vercel.app";
+        return res.redirect(`${clientUrl}/login?error=oauth_failed`);
+      }
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   googleCallback
 );
 
