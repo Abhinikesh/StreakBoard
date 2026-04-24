@@ -1,11 +1,11 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import auth from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import { uploadAvatar } from '../controllers/userController.js';
 
 const router = express.Router();
 
 // POST /api/user/avatar
-router.post('/avatar', authenticateToken, upload.single('avatar'), uploadAvatar);
+router.post('/avatar', auth, upload.single('avatar'), uploadAvatar);
 
 export default router;
