@@ -18,6 +18,8 @@ export const uploadAvatar = async (req, res) => {
     await User.findByIdAndUpdate(req.user.id, { avatar: result.secure_url });
     res.json({ avatar: result.secure_url });
   } catch (error) {
-    res.status(500).json({ message: 'Upload failed' });
+    console.log('=== UPLOAD AVATAR CATCH ERROR ===');
+    console.log(error);
+    res.status(500).json({ message: 'Upload failed', error: error.message });
   }
 };
