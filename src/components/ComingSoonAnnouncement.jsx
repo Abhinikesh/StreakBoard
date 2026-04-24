@@ -13,14 +13,6 @@ const ONE_DAY_MS = 86_400_000;
 
 const FEATURES = [
   {
-    emoji: '🖼️',
-    name: 'Profile Pictures',
-    desc: 'Upload your avatar',
-    badge: 'In Progress',
-    badgeColor: '#22c55e',
-    badgeBg: 'rgba(34,197,94,0.15)',
-  },
-  {
     emoji: '💬',
     name: 'Personal Chat',
     desc: 'Chat with friends',
@@ -63,7 +55,7 @@ const FEATURES = [
 ];
 
 const MARQUEE_TEXT =
-  '🚀 Coming Soon: Profile Pictures  •  💬 Personal Chat  •  🏆 100-Day Streak Rewards  •  📱 Mobile App  •  🔔 Tap-to-Mark Notifications  •  🌐 Browser Extension  •  👥 Friend Activity Alerts  •  ';
+  '🚀 Coming Soon: 💬 Personal Chat  •  🏆 100-Day Streak Rewards  •  📱 Mobile App  •  🔔 Tap-to-Mark Notifications  •  🌐 Browser Extension  •  👥 Friend Activity Alerts  •  ';
 
 // ─── CSS injected once ───────────────────────────────────────────────────────
 const CSS = `
