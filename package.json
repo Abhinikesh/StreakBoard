@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.99.1",
+    "@vercel/analytics": "^2.0.1",
     "axios": "^1.15.0",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
