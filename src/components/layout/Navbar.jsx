@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import AvatarUpload from '../AvatarUpload';
 
 export default function Navbar() {
   const { user, logout, updateUser } = useAuth();
@@ -69,16 +68,18 @@ export default function Navbar() {
             >
               Logout
             </button>
-            <div className="flex items-center outline-none ring-2 ring-transparent focus:ring-indigo-500 rounded-full transition-all hover:scale-105">
-              <AvatarUpload
-                avatarUrl={user?.avatar || user?.avatarUrl}
-                name={user?.name || user?.firstName}
-                size={36}
-                onUpdate={(newUrl) => {
-                  if (updateUser) updateUser({ avatar: newUrl, avatarUrl: newUrl });
-                }}
-              />
-            </div>
+            <button 
+              onClick={() => navigate('/profile')}
+              className="flex items-center outline-none ring-2 ring-transparent focus:ring-indigo-500 rounded-full transition-all hover:scale-105"
+            >
+              {user?.avatar || user?.avatarUrl ? (
+                <img src={user.avatar || user.avatarUrl} alt="Profile" className="w-9 h-9 rounded-full object-cover shadow-sm bg-gray-50" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-700 text-indigo-700 dark:text-indigo-100 flex items-center justify-center font-bold text-sm shadow-sm ring-1 ring-indigo-200 dark:ring-indigo-600">
+                  {initChar}
+                </div>
+              )}
+            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -121,18 +122,15 @@ export default function Navbar() {
             })}
           </div>
           <div className="pt-4 pb-4 border-t border-gray-100 dark:border-gray-700 px-4">
-            <div className="flex items-center px-4 mb-4 gap-3 bg-gray-50 dark:bg-gray-800 py-3 rounded-xl transition-colors">
-              <div onClick={(e) => e.stopPropagation()}>
-                <AvatarUpload
-                  avatarUrl={user?.avatar || user?.avatarUrl}
-                  name={user?.name || user?.firstName}
-                  size={40}
-                  onUpdate={(newUrl) => {
-                    if (updateUser) updateUser({ avatar: newUrl, avatarUrl: newUrl });
-                  }}
-                />
-              </div>
-              <div className="cursor-pointer flex-1" onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}>
+            <div className="flex items-center px-4 mb-4 gap-3 bg-gray-50 dark:bg-gray-800 py-3 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}>
+              {user?.avatar || user?.avatarUrl ? (
+                <img src={user.avatar || user.avatarUrl} alt="Profile" className="w-10 h-10 rounded-full object-cover shadow-sm bg-white" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-700 text-indigo-700 dark:text-indigo-100 flex items-center justify-center font-bold shadow-sm ring-1 ring-indigo-200 dark:ring-indigo-600">
+                  {initChar}
+                </div>
+              )}
+              <div>
                 <p className="text-base font-bold text-gray-800 dark:text-white leading-tight">{displayName}</p>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">View Profile</p>
               </div>
