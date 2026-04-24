@@ -224,8 +224,8 @@ function ListRow({ person, rank, isDark, onNavigate }) {
       {/* Stats */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
         <StatCell label="🔥 Streak" value={person.longestStreak} color="#f59e0b" isDark={isDark} />
-        <StatCell label="📊 Rate" value={`${person.overallRate}%`} color="#6366f1" isDark={isDark} hideOnMobile />
-        <StatCell label="✅ Done" value={person.totalDone} color="#10b981" isDark={isDark} hideOnMobile />
+        <StatCell label="📊 Rate" value={`${person.overallRate}%`} color="#6366f1" isDark={isDark} />
+        <StatCell label="✅ Done" value={person.totalDone} color="#10b981" isDark={isDark} />
         {person.shareCode && !isYou ? (
           <button
             onClick={() => onNavigate(`/u/${person.shareCode}`)}
@@ -255,12 +255,9 @@ function ListRow({ person, rank, isDark, onNavigate }) {
   );
 }
 
-function StatCell({ label, value, color, isDark, hideOnMobile }) {
+function StatCell({ label, value, color, isDark }) {
   return (
-    <div style={{
-      textAlign: 'center',
-      minWidth: 44,
-    }} className={hideOnMobile ? 'hidden sm:block' : ''}>
+    <div style={{ textAlign: 'center', minWidth: 44 }}>
       <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color }}>{value}</p>
       <p style={{ margin: 0, fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af' }}>{label}</p>
     </div>
@@ -464,44 +461,49 @@ export default function LeaderboardPage() {
             background: cardBg, border: `1px solid ${cardBorder}`,
             borderRadius: 20, overflow: 'hidden',
           }}>
-            {/* Table header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: '10px 20px',
-              borderBottom: `1px solid ${cardBorder}`,
-              background: isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb',
-            }}>
-              <span style={{ width: 28, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
-                #
-              </span>
-              <span style={{ flex: 1, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor, marginLeft: 52 }}>
-                Player
-              </span>
-              <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
-                {['🔥 Streak','📊 Rate','✅ Done'].map((h) => (
-                  <span key={h} style={{ minWidth: 44, textAlign: 'center', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
-                    {h}
-                  </span>
-                ))}
-                {/* spacer for view button column */}
-                <span style={{ width: 60 }} />
+            {/* Horizontally scrollable on mobile so all columns stay visible */}
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: 600 }}>
+              {/* Table header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '10px 20px',
+                borderBottom: `1px solid ${cardBorder}`,
+                background: isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb',
+              }}>
+                <span style={{ width: 28, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
+                  #
+                </span>
+                <span style={{ flex: 1, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor, marginLeft: 52 }}>
+                  Player
+                </span>
+                <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+                  {['🔥 Streak','📊 Rate','✅ Done'].map((h) => (
+                    <span key={h} style={{ minWidth: 44, textAlign: 'center', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
+                      {h}
+                    </span>
+                  ))}
+                  {/* spacer for view button column */}
+                  <span style={{ width: 60 }} />
+                </div>
               </div>
-            </div>
 
-            {/* If fewer than 4, show all. Otherwise only show from rank 4 */}
-            {(sorted.length < 4 ? sorted : rest).map((person, i) => {
-              const rankNum = sorted.length < 4 ? i + 1 : i + 4;
-              return (
-                <ListRow
-                  key={person.shareCode || person.name + i}
-                  person={person}
-                  rank={rankNum}
-                  isDark={isDark}
-                  onNavigate={navigate}
-                />
-              );
-            })}
+              {/* If fewer than 4, show all. Otherwise only show from rank 4 */}
+              {(sorted.length < 4 ? sorted : rest).map((person, i) => {
+                const rankNum = sorted.length < 4 ? i + 1 : i + 4;
+                return (
+                  <ListRow
+                    key={person.shareCode || person.name + i}
+                    person={person}
+                    rank={rankNum}
+                    isDark={isDark}
+                    onNavigate={navigate}
+                  />
+                );
+              })}
+            </div>
           </div>
+
         )}
 
       </div>
