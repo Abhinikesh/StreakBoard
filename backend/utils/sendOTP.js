@@ -19,19 +19,9 @@ const transporter = nodemailer.createTransport({
  * @param {string} email
  */
 export const sendOTPEmail = async (email) => {
-  // Generate a zero-padded 6-digit OTP
-  // const otp = String(Math.floor(100000 + Math.random() * 900000));
-
-
-
-
-
-  const otp = "123456";
-  console.log(`🔑 OTP for ${email}: ${otp}`); // ADD THIS
-
-
-
-
+  // Generate a random 6-digit OTP
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  console.log(`🔑 OTP for ${email}: ${otp}`); // visible in Render logs
 
   // Store with 10-minute expiry
   otpStore.set(email, {
@@ -53,7 +43,13 @@ export const sendOTPEmail = async (email) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (mailErr) {
+    // Log the error but don't throw — OTP is already stored.
+    // The user can retrieve it from Render logs until a valid App Password is configured.
+    console.error('[sendOTPEmail] Gmail send failed (check EMAIL_PASS is a Gmail App Password):', mailErr.message);
+  }
 };
 
 /**
