@@ -212,6 +212,7 @@ export const getLeaderboard = async (req, res) => {
   try {
     const users = await User.find({
       isProfilePublic: true,
+      shareCode: { $exists: true, $ne: null, $nin: ['', null] },
     }).select('name avatar shareCode createdAt');
 
     const leaderboardData = await Promise.all(

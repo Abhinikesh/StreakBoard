@@ -226,7 +226,7 @@ function ListRow({ person, rank, isDark, onNavigate }) {
         <StatCell label="🔥 Streak" value={person.longestStreak} color="#f59e0b" isDark={isDark} />
         <StatCell label="📊 Rate" value={`${person.overallRate}%`} color="#6366f1" isDark={isDark} hideOnMobile />
         <StatCell label="✅ Done" value={person.totalDone} color="#10b981" isDark={isDark} hideOnMobile />
-        {person.shareCode && !isYou && (
+        {person.shareCode && !isYou ? (
           <button
             onClick={() => onNavigate(`/u/${person.shareCode}`)}
             style={{
@@ -240,7 +240,16 @@ function ListRow({ person, rank, isDark, onNavigate }) {
           >
             View →
           </button>
-        )}
+        ) : !isYou ? (
+          <span style={{
+            padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+            color: isDark ? 'rgba(255,255,255,0.2)' : '#d1d5db',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'}`,
+            userSelect: 'none',
+          }}>
+            —
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -64,6 +64,15 @@ export default function FriendsPage() {
     onError: (e) => toast.error(e.response?.data?.message || 'Could not add friend'),
   });
 
+  // Strip full URL if user pastes a profile link instead of just the code
+  const cleanCode = (raw) => {
+    let code = raw.trim();
+    if (code.includes('/u/')) {
+      code = code.split('/u/').pop().trim();
+    }
+    return code;
+  };
+
   const removeFriendMut = useMutation({
     mutationFn: (sc) => api.delete(`/api/social/friends/${sc}`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['friends'] }); toast('Friend removed.'); },
@@ -195,12 +204,12 @@ export default function FriendsPage() {
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 border-b border-gray-100 dark:border-gray-700 pb-3">Add a friend</h2>
           <div className="flex gap-2">
             <input
-              type="text" value={addCode} onChange={e => setAddCode(e.target.value.trim().toLowerCase())}
-              placeholder="Enter share code (e.g. john-x7k2)"
+              type="text" value={addCode} onChange={e => setAddCode(e.target.value)}
+              placeholder="Enter share code or paste profile link"
               className="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              onKeyDown={e => e.key === 'Enter' && addCode && addFriendMut.mutate(addCode)}
+              onKeyDown={e => e.key === 'Enter' && addCode && addFriendMut.mutate(cleanCode(addCode))}
             />
-            <button onClick={() => addCode && addFriendMut.mutate(addCode)} disabled={addFriendMut.isPending || !addCode}
+            <button onClick={() => addCode && addFriendMut.mutate(cleanCode(addCode))} disabled={addFriendMut.isPending || !addCode}
               className="bg-indigo-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-60 text-sm shrink-0">
               {addFriendMut.isPending ? '...' : 'Add Friend'}
             </button>
