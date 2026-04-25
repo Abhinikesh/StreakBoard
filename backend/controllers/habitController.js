@@ -1,4 +1,5 @@
 import Habit from "../models/Habit.js";
+import HabitLog from "../models/HabitLog.js";
 
 // ── POST /api/habits ───────────────────────────────────────────
 /**
@@ -127,5 +128,44 @@ export const deleteHabit = async (req, res) => {
   } catch (err) {
     console.error("[deleteHabit]", err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ── POST /api/habits/mark-all-done ────────────────────────────────────
+/**
+ * Mark every active habit as 'done' for today.
+ * Called by the service worker notification action via postMessage → page → API.
+ * Skips habits that are already marked done today.
+ */
+export const markAllHabitsDone = async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+    const habits = await Habit.find({ userId: req.user.id, isActive: true });
+    if (habits.length === 0) {
+      return res.json({ message: 'No active habits', count: 0 });
+    }
+
+    let count = 0;
+    for (const habit of habits) {
+      const existing = await HabitLog.findOne({
+        habitId: habit._id,
+        userId:  req.user.id,
+        date:    today,
+      });
+      if (!existing || existing.status !== 'done') {
+        await HabitLog.findOneAndUpdate(
+          { habitId: habit._id, userId: req.user.id, date: today },
+          { $set: { userId: req.user.id, habitId: habit._id, date: today, status: 'done' } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        count++;
+      }
+    }
+
+    return res.json({ message: `${count} habit${count !== 1 ? 's' : ''} marked done`, count });
+  } catch (err) {
+    console.error('[markAllHabitsDone]', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };

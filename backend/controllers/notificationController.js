@@ -144,9 +144,14 @@ export const sendFriendDigest = async () => {
       const payload = JSON.stringify({
         title: 'Your friends are crushing it! 💪',
         body: `${activeFriendCount} of your friend${activeFriendCount > 1 ? 's' : ''} completed habits today — don't break your streak!`,
-        icon: '/icon-192.png',
+        icon:  '/icon-192.png',
         badge: '/icon-192.png',
-        url: '/friends',
+        tag:   'friend-digest',
+        actions: [
+          { action: 'mark-all-done', title: '✅ Mark All Done' },
+          { action: 'open-app',      title: '📱 Open App'     },
+        ],
+        data: { url: '/dashboard' },
       });
 
       const subscriptions = await PushSubscription.find({ userId: user._id });
@@ -244,7 +249,11 @@ export const sendGlobalReminders = async (type) => {
         icon:  '/icon-192.png',
         badge: '/icon-192.png',
         tag:   `global-${type}`,
-        data:  { url: '/dashboard' },
+        actions: [
+          { action: 'mark-all-done', title: '✅ Mark All Done' },
+          { action: 'open-app',      title: '📱 Open App'     },
+        ],
+        data: { url: '/dashboard' },
       });
 
       // Send to every registered device for this user

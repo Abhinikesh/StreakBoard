@@ -6,6 +6,7 @@ import {
   getHabitById,
   updateHabit,
   deleteHabit,
+  markAllHabitsDone,
 } from "../controllers/habitController.js";
 
 const router = express.Router();
@@ -16,8 +17,12 @@ router.use(authMiddleware);
 // GET    /api/habits       → list all active habits for user
 router.get("/", getHabits);
 
-// POST   /api/habits       → create a new habit
+// POST   /api/habits               → create a new habit
 router.post("/", createHabit);
+
+// POST   /api/habits/mark-all-done → mark all active habits done for today
+// IMPORTANT: must be declared before /:id so 'mark-all-done' isn't treated as a param
+router.post("/mark-all-done", markAllHabitsDone);
 
 // GET    /api/habits/:id   → get a single habit by id
 router.get("/:id", getHabitById);
