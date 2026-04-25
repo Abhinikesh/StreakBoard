@@ -37,11 +37,17 @@ export function startReminderJob() {
 
       if (users.length > 0) {
         const payload = JSON.stringify({
-          title: 'StreakBoard Reminder 🔥',
-          body:  'Time to log your habits and protect your streak!',
-          icon:  '/icon-192.png',
-          badge: '/icon-192.png',
-          url:   '/dashboard',
+          title:    'StreakBoard Reminder 🔥',
+          body:     'Time to log your habits and protect your streak!',
+          icon:     '/icon-192.png',
+          badge:    '/icon-192.png',
+          tag:      'personal-reminder',
+          renotify: true,
+          actions: [
+            { action: 'mark-all-done', title: '✅ Mark All Done' },
+            { action: 'open-app',      title: '📱 Open App'     },
+          ],
+          data: { url: '/dashboard' },
         });
 
         for (const user of users) {
