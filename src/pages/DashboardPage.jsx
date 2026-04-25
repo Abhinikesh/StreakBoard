@@ -190,7 +190,7 @@ export default function DashboardPage() {
           </div>
         ) : totalHabits === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 shadow-sm mt-8">
-            <div className="text-7xl mb-4 bg-indigo-50 dark:bg-indigo-900/30 w-24 h-24 rounded-full flex items-center justify-center shrink-0">🌱</div>
+            <div className="text-7xl mb-4 bg-indigo-50 dark:bg-indigo-900/30 w-24 h-24 rounded-full flex items-center justify-center shrink-0">✨</div>
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 mt-2">No habits yet</h3>
             <p className="text-gray-600 dark:text-gray-300 text-center mb-10 max-w-sm text-base leading-relaxed">
               Add your first habit to start building discipline and tracking your daily progress.

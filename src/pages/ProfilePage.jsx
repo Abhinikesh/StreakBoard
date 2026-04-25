@@ -412,7 +412,7 @@ export default function ProfilePage() {
         {/* ──────────────────────────────────────────────────────────────────── */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
           <h2 className="text-base font-bold mb-4 pb-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
-            <span>✏️</span> My Habits
+            <span>📋</span> My Habits
           </h2>
 
           {/* Loading skeleton */}
@@ -425,7 +425,7 @@ export default function ProfilePage() {
           ) : habits.length === 0 && !showAddRow ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="text-5xl mb-3">🌱</div>
+              <div className="text-5xl mb-3">✨</div>
               <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No habits yet.</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add your first one below.</p>
             </div>
@@ -618,7 +618,7 @@ export default function ProfilePage() {
                 border: '1px solid rgba(239, 68, 68, 0.3)',
               }}
             >
-              <span className="text-lg shrink-0">🔕</span>
+              <span className="text-lg shrink-0">🚫</span>
               <div>
                 <p className="text-sm font-medium text-red-400">
                   Notifications are blocked
