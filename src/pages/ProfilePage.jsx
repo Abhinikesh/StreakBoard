@@ -587,22 +587,51 @@ export default function ProfilePage() {
         {/* ──────────────────────────────────────────────────────────────────── */}
         {/* SECTION 5 — Daily Reminders                                         */}
         {/* ──────────────────────────────────────────────────────────────────── */}
+        {/* Derive blocked state from the permission value tracked by useNotifications */}
+        {(() => { const notificationBlocked = isSupported && permission === 'denied'; return (
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-base font-bold flex items-center gap-2">
               <span>🔔</span> Daily Reminders
             </h2>
-            {/* Master toggle */}
+            {/* Master toggle — greyed out and non-interactive when notifications are blocked */}
             <button
               role="switch"
               aria-checked={isSubscribed}
               onClick={() => isSubscribed ? unsubscribePush() : subscribePush()}
-              disabled={notifLoading}
-              className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${notifLoading ? 'opacity-50 pointer-events-none' : ''} ${isSubscribed ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+              disabled={notifLoading || notificationBlocked}
+              title={notificationBlocked ? 'Unblock notifications in browser settings first' : undefined}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                notifLoading || notificationBlocked ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+              } ${isSubscribed ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
             >
               <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${isSubscribed ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
+
+          {/* Blocked banner — shows when user has denied notifications in browser */}
+          {notificationBlocked && (
+            <div
+              className="flex items-start gap-3 p-3 rounded-xl mb-4"
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+              }}
+            >
+              <span className="text-lg shrink-0">🔕</span>
+              <div>
+                <p className="text-sm font-medium text-red-400">
+                  Notifications are blocked
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted, #9ca3af)' }}>
+                  To receive habit reminders, enable notifications in your browser settings.
+                </p>
+                <p className="text-xs mt-1 text-red-400 font-medium">
+                  Chrome: Click the 🔒 lock icon in the address bar → Notifications → Allow
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Browser not supported */}
           {!isSupported && (
@@ -610,16 +639,6 @@ export default function ProfilePage() {
               <p className="text-sm text-amber-700 dark:text-amber-400">
                 Push notifications are not supported in this browser.
                 Try Chrome or Edge on desktop, or Chrome on Android.
-              </p>
-            </div>
-          )}
-
-          {/* Permission blocked */}
-          {isSupported && permission === 'denied' && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4 mt-4">
-              <p className="text-sm text-red-600 dark:text-red-400">
-                Notifications are blocked. Please click the 🔒 icon in your
-                browser's address bar and allow notifications for this site.
               </p>
             </div>
           )}
@@ -670,6 +689,7 @@ export default function ProfilePage() {
             )
           )}
         </section>
+        ); })()}
 
         {/* ──────────────────────────────────────────────────────────────────── */}
         {/* SECTION 6 — Account Access / Danger Zone                            */}
