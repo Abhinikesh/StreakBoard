@@ -159,14 +159,20 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
-            <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="rounded-full overflow-hidden"
+              style={{ height: 8, background: 'rgba(255,255,255,0.08)', width: '100%' }}
+            >
               <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  isPerfectDay
-                    ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
-                    : 'bg-gradient-to-r from-indigo-500 to-purple-500'
-                }`}
-                style={{ width: `${progressPercent}%` }}
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${progressPercent}%`,
+                  background: isPerfectDay
+                    ? 'linear-gradient(90deg, #10b981, #06b6d4)'   /* green → cyan  */
+                    : progressPercent >= 50
+                    ? 'linear-gradient(90deg, #7c3aed, #06b6d4)'   /* purple → cyan */
+                    : 'linear-gradient(90deg, #ef4444, #f59e0b)',   /* red → orange  */
+                }}
               />
             </div>
           </div>
