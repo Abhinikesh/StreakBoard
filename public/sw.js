@@ -1,5 +1,14 @@
 // Service Worker for StreakBoard push notifications
 
+// ── Lifecycle: activate new SW immediately on deploy ─────────────────────────
+self.addEventListener('install', (event) => {
+  self.skipWaiting(); // activate new SW immediately
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim()); // take control of all open tabs immediately
+});
+
 // ── Push event: show the notification ────────────────────────────────────────
 self.addEventListener('push', (event) => {
   let data = {};
