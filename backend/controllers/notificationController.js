@@ -143,7 +143,7 @@ export const sendFriendDigest = async () => {
 
       const payload = JSON.stringify({
         title: 'Your friends are crushing it! 💪',
-        body: `${activeFriendCount} of your friend${activeFriendCount > 1 ? 's' : ''} completed habits today — don’t break your streak!`,
+        body: `${activeFriendCount} of your friend${activeFriendCount > 1 ? 's' : ''} completed habits today — don't break your streak!`,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
         url: '/friends',
@@ -169,3 +169,71 @@ export const sendFriendDigest = async () => {
     console.error('[sendFriendDigest] Error:', err);
   }
 };
+
+// ── Global daily reminders (morning / afternoon / night) ────────────
+// Sends to ALL users who have a push subscription BUT do NOT have a
+// personal reminder enabled — preventing double notifications.
+// Push subscriptions live in the PushSubscription collection (not on User).
+export const sendGlobalReminders = async (type) => {
+  try {
+    const messages = {
+      morning: {
+        title: '🌅 Good Morning, Streak Builder!',
+        body: "Start your day strong — mark your habits done! 💪",
+      },
+      afternoon: {
+        title: '☀️ Afternoon Check-in!',
+        body: "How are your habits going? Don't let the day slip by! 🔥",
+      },
+      night: {
+        title: '🌙 Last Chance Today!',
+        body: "Don't break your streak! Mark your habits before midnight 🏃",
+      },
+    };
+
+    const notification = messages[type];
+    if (!notification) return;
+
+    // Users who have personal reminders turned OFF (or no reminderEnabled set)
+    // — these are the only ones who receive global reminders.
+    const excludedUsers = await User.find({ reminderEnabled: true }).select('_id').lean();
+    const excludedIds = excludedUsers.map((u) => u._id);
+
+    // All subscriptions whose owner is NOT in the excluded list
+    const subscriptions = await PushSubscription.find({
+      userId: { $nin: excludedIds },
+    });
+
+    console.log(`📢 [GlobalReminder] Sending ${type} to ${subscriptions.length} subscriptions`);
+
+    const payload = JSON.stringify({
+      title: notification.title,
+      body:  notification.body,
+      icon:  '/icon-192.png',
+      badge: '/icon-192.png',
+      tag:   `global-${type}`,
+      data:  { url: '/dashboard' },
+    });
+
+    for (const sub of subscriptions) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          payload
+        );
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await PushSubscription.deleteOne({ _id: sub._id });
+          console.log(`🗑  [GlobalReminder] Removed expired subscription ${sub._id}`);
+        } else {
+          console.error('[GlobalReminder] Push send error:', err.message);
+        }
+      }
+    }
+
+    console.log(`✅ [GlobalReminder] ${type} done`);
+  } catch (err) {
+    console.error(`❌ [GlobalReminder] Error:`, err);
+  }
+};
+

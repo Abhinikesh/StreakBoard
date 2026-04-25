@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import webpush from 'web-push';
 import User from '../models/User.js';
 import PushSubscription from '../models/PushSubscription.js';
-import { sendFriendDigest } from '../controllers/notificationController.js';
+import { sendFriendDigest, sendGlobalReminders } from '../controllers/notificationController.js';
 
 // reminderTime is stored in UTC. On the frontend, the user sees their local
 // time converted to UTC before saving. See useNotifications hook for conversion.
@@ -76,4 +76,22 @@ export function startReminderJob() {
   });
 
   console.log('🔔 Reminder cron job started (runs every minute)');
+
+  // ── 7:00 AM IST (01:30 UTC) — Morning global reminder ──────────────
+  cron.schedule('30 1 * * *', () => {
+    console.log('🌅 [GlobalReminder] Morning triggered');
+    sendGlobalReminders('morning');
+  });
+
+  // ── 2:00 PM IST (08:30 UTC) — Afternoon global reminder ────────────
+  cron.schedule('30 8 * * *', () => {
+    console.log('☀️  [GlobalReminder] Afternoon triggered');
+    sendGlobalReminders('afternoon');
+  });
+
+  // ── 9:00 PM IST (15:30 UTC) — Night global reminder ────────────────
+  cron.schedule('30 15 * * *', () => {
+    console.log('🌙 [GlobalReminder] Night triggered');
+    sendGlobalReminders('night');
+  });
 }
