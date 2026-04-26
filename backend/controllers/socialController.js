@@ -238,33 +238,46 @@ export const getLeaderboard = async (req, res) => {
             ? Math.round((totalDone / (totalDone + totalMissed)) * 100)
             : 0;
 
-        // Calculate longest streak across all habits
+        // ── Current streak calculation ─────────────────────────
+        // Rules:
+        //   - Both 'done' and 'missed' keep the streak alive
+        //   - Only a day with NO log at all breaks it
+        //   - Streak is 0 if neither today nor yesterday has any log
+        const pad = n => String(n).padStart(2, '0');
+        const toStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        const now = new Date();
+        const todayStr = toStr(now);
+        const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+        const yesterdayStr = toStr(yest);
+
         let longestStreak = 0;
         habits.forEach((habit) => {
-          const habitDoneDates = logs
-            .filter(
-              (l) =>
-                l.habitId.toString() === habit._id.toString() &&
-                l.status === 'done'
-            )
-            .map((l) => l.date)
-            .sort();
+          // All logged dates for this habit — both done and missed count
+          const habitLoggedDates = new Set(
+            logs
+              .filter(l => l.habitId.toString() === habit._id.toString())
+              .map(l => l.date)
+          );
 
-          let best = 0,
-            run = 0;
-          for (let i = 0; i < habitDoneDates.length; i++) {
-            if (i === 0) {
-              run = 1;
-              continue;
+          // Streak is dead if neither today nor yesterday has any log
+          if (!habitLoggedDates.has(todayStr) && !habitLoggedDates.has(yesterdayStr)) return;
+
+          // Start from today if logged, otherwise from yesterday
+          const startDate = habitLoggedDates.has(todayStr) ? new Date(now) : new Date(yest);
+
+          let run = 0;
+          const cur = new Date(startDate);
+          while (true) {
+            const ds = toStr(cur);
+            if (habitLoggedDates.has(ds)) {
+              run++;
+              cur.setDate(cur.getDate() - 1);
+            } else {
+              break;
             }
-            const prev = new Date(habitDoneDates[i - 1] + 'T00:00:00');
-            const curr = new Date(habitDoneDates[i] + 'T00:00:00');
-            const diff = (curr - prev) / (1000 * 60 * 60 * 24);
-            run = diff === 1 ? run + 1 : 1;
-            if (run > best) best = run;
           }
-          if (run > best) best = run;
-          if (best > longestStreak) longestStreak = best;
+          if (run > longestStreak) longestStreak = run;
         });
 
         return {

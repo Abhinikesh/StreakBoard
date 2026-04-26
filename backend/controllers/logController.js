@@ -3,23 +3,43 @@ import Habit from "../models/Habit.js";
 import mongoose from "mongoose";
 
 // ── Helper: compute current streak for a habit from its logs ───
+// Rules:
+//   - Both 'done' and 'missed' statuses keep the streak alive
+//   - Only a day with NO log entry at all breaks the streak
+//   - Streak is active if today OR yesterday has any log
+//     (grace period: user can still log today without losing yesterday's streak)
+//   - If neither today nor yesterday is logged → streak = 0
 async function computeStreak(habitId) {
-  const logs = await HabitLog.find({ habitId, status: 'done' }).select('date').lean();
-  const doneDates = new Set(logs.map(l => l.date));
+  // Fetch ALL logs regardless of status — missed also keeps streak alive
+  const logs = await HabitLog.find({ habitId }).select('date').lean();
+  const loggedDates = new Set(logs.map(l => l.date));
 
   const pad = n => String(n).padStart(2, '0');
+  const toStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const todayStr = toStr(today);
 
-  if (!doneDates.has(todayStr)) return 0;
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = toStr(yesterday);
 
-  let streak = 1;
-  const cur = new Date(today);
-  cur.setDate(cur.getDate() - 1);
+  // Streak is dead if neither today nor yesterday has any log
+  if (!loggedDates.has(todayStr) && !loggedDates.has(yesterdayStr)) return 0;
+
+  // Start counting from today if logged, otherwise from yesterday
+  const startDate = loggedDates.has(todayStr) ? new Date(today) : new Date(yesterday);
+
+  let streak = 0;
+  const cur = new Date(startDate);
   while (true) {
-    const ds = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
-    if (doneDates.has(ds)) { streak++; cur.setDate(cur.getDate() - 1); }
-    else break;
+    const ds = toStr(cur);
+    if (loggedDates.has(ds)) {
+      streak++;
+      cur.setDate(cur.getDate() - 1);
+    } else {
+      break;
+    }
   }
   return streak;
 }
