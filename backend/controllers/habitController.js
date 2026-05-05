@@ -1,5 +1,6 @@
 import Habit from "../models/Habit.js";
 import HabitLog from "../models/HabitLog.js";
+import { grantXp } from '../lib/xp.js';
 
 // ── POST /api/habits ───────────────────────────────────────────
 /**
@@ -26,6 +27,12 @@ export const createHabit = async (req, res) => {
       trackingPeriod: Number(trackingPeriod) || 30,
       startDate: resolvedStartDate,
     });
+
+    // XP: +20 one-time award for creating the very first habit
+    const habitCount = await Habit.countDocuments({ userId: req.user.id });
+    if (habitCount === 1) {
+      await grantXp(req.user.id, 20, 'Created first habit', 'first_habit');
+    }
 
     return res.status(201).json(habit);
   } catch (err) {
@@ -169,3 +176,32 @@ export const markAllHabitsDone = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+// ── PATCH /api/habits/:id/reminder ────────────────────────────────────────────
+export const updateHabitReminder = async (req, res) => {
+  try {
+    const { reminderEnabled, reminderTime } = req.body;
+    const habitId = req.params.id;
+
+    // Validate time format if provided
+    if (reminderTime !== null && reminderTime !== undefined) {
+      const parts = String(reminderTime).split(':');
+      const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59)
+        return res.status(400).json({ message: 'Invalid time format. Use HH:MM.' });
+    }
+
+    const habit = await Habit.findOne({ _id: habitId, userId: req.user.id });
+    if (!habit) return res.status(404).json({ message: 'Habit not found.' });
+
+    if (reminderEnabled !== undefined) habit.reminderEnabled = !!reminderEnabled;
+    if (reminderTime    !== undefined) habit.reminderTime    = reminderTime || null;
+    await habit.save();
+
+    return res.json(habit);
+  } catch (err) {
+    console.error('[updateHabitReminder]', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+

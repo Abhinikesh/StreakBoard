@@ -1,6 +1,13 @@
 import HabitLog from "../models/HabitLog.js";
 import Habit from "../models/Habit.js";
 import mongoose from "mongoose";
+import { grantXp, getStreakMilestone } from '../lib/xp.js';
+import { grantShield } from '../lib/shields.js';
+import Season from '../models/Season.js';
+import SeasonRanking from '../models/SeasonRanking.js';
+import WeeklyChallenge from '../models/WeeklyChallenge.js';
+import FriendChallenge from '../models/FriendChallenge.js';
+import { evaluateUserProgress } from '../lib/weeklyChallenge.js';
 
 // ── Helper: compute current streak for a habit from its logs ───
 // Rules:
@@ -65,9 +72,13 @@ export const logHabit = async (req, res) => {
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
 
-    // ── Badge: award 100-day streak badge if earned ──────────────
+    // ── Badge: award 100-day streak badge if earned ──
+    let xpResult = null;   // accumulates level-up info for response
+    let totalXpGained = 0;
+
     if (status === 'done') {
       const streak = await computeStreak(habitId);
+
       if (streak >= 100) {
         const habit = await Habit.findOne({ _id: habitId, userId: req.user.id });
         if (habit && !habit.badges.some(b => b.type === '100_day_streak')) {
@@ -79,9 +90,122 @@ export const logHabit = async (req, res) => {
           await habit.save();
         }
       }
+
+      // ── XP: +10 per done log (once per habit per day) ────────────────────────
+      const habitLogKey = `habit_done_${habitId}_${date}`;
+      const r1 = await grantXp(req.user.id, 10, `Logged habit on ${date}`, habitLogKey);
+      if (r1) { xpResult = r1; totalXpGained += 10; }
+
+      // ── Season: update user's best streak for the current season ─────────
+      if (streak > 0) {
+        const activeSeason = await Season.findOne({ status: 'active' }).select('_id').lean();
+        if (activeSeason) {
+          await SeasonRanking.findOneAndUpdate(
+            { seasonId: activeSeason._id, userId: req.user.id },
+            { $max: { bestStreak: streak } },
+            { upsert: true, setDefaultsOnInsert: true }
+          );
+        }
+      }
+
+      // ── Weekly challenge: re-evaluate progress (fire-and-forget) ────────
+      WeeklyChallenge.findOne({ status: 'active' }).select('_id type targetValue title startDate endDate').lean()
+        .then(wc => { if (wc) evaluateUserProgress(req.user.id, wc).catch(() => {}); })
+        .catch(() => {});
+
+      // ── Friend challenges: credit today's log (fire-and-forget) ──────────
+      const today = date; // already 'YYYY-MM-DD' from request body
+      FriendChallenge.find({
+        $or: [{ challengerId: req.user.id }, { challengedId: req.user.id }],
+        status: 'active',
+      }).select('_id challengerId habitName startDate endDate challengerDaysLogged challengedDaysLogged').lean()
+        .then(async (activeFCs) => {
+          for (const fc of activeFCs) {
+            // Only credit if logged date is within challenge window
+            if (today < fc.startDate || today > fc.endDate) continue;
+            const hName = (h?.name || '').toLowerCase().trim();
+            if (!hName || hName !== fc.habitName.toLowerCase().trim()) continue;
+            const isChallenger = fc.challengerId.toString() === req.user.id.toString();
+            const field = isChallenger ? 'challengerDaysLogged' : 'challengedDaysLogged';
+            const alreadyLogged = isChallenger
+              ? fc.challengerDaysLogged.includes(today)
+              : fc.challengedDaysLogged.includes(today);
+            if (!alreadyLogged) {
+              await FriendChallenge.findByIdAndUpdate(fc._id, { $addToSet: { [field]: today } });
+            }
+          }
+        }).catch(() => {});
+
+      // ── XP: streak milestones ───────────────────────────────────────
+      const milestone = getStreakMilestone(streak);
+      if (milestone) {
+        // key includes streak start date so each new streak can earn the milestone again
+        const logDate = new Date(date + 'T00:00:00Z');
+        const startDate = new Date(logDate);
+        startDate.setUTCDate(logDate.getUTCDate() - (streak - 1));
+        const startStr = startDate.toISOString().split('T')[0];
+        const mKey = `streak_${milestone.milestone}_${habitId}_${startStr}`;
+        const r2 = await grantXp(
+          req.user.id, milestone.xp,
+          `${milestone.milestone}-day streak on ${date}`,
+          mKey
+        );
+        if (r2) { xpResult = r2; totalXpGained += milestone.xp; }
+      }
+
+      // ── XP: +25 full-day completion bonus ──────────────────────────────
+      const fullDayKey = `full_day_${req.user.id}_${date}`;
+      const activeHabits = await Habit.countDocuments({ userId: req.user.id, isActive: true });
+      const doneTodayCount = await HabitLog.countDocuments({ userId: req.user.id, date, status: 'done' });
+      if (activeHabits > 0 && doneTodayCount >= activeHabits) {
+        const r3 = await grantXp(req.user.id, 25, `All habits completed on ${date}`, fullDayKey);
+        if (r3) { xpResult = r3; totalXpGained += 25; }
+      }
+
+      // ── Shields: earn at streak milestones ──────────────────────────────
+      if (milestone) {
+        const logDate2 = new Date(date + 'T00:00:00Z');
+        const sDate = new Date(logDate2);
+        sDate.setUTCDate(logDate2.getUTCDate() - (streak - 1));
+        const sStr = sDate.toISOString().split('T')[0];
+
+        let shieldAmount = 0;
+        let shieldMilestoneLabel = '';
+        if (milestone.milestone === 7)  { shieldAmount = 1; shieldMilestoneLabel = '7-day streak'; }
+        if (milestone.milestone === 14) { shieldAmount = 1; shieldMilestoneLabel = '14-day streak'; }
+        if (milestone.milestone >= 30)  { shieldAmount = 2; shieldMilestoneLabel = `${milestone.milestone}-day streak`; }
+
+        if (shieldAmount > 0) {
+          const shieldKey = `shield_streak_${milestone.milestone}_${habitId}_${sStr}`;
+          await grantShield(
+            req.user.id, shieldAmount,
+            `Earned ${shieldAmount} shield${shieldAmount > 1 ? 's' : ''} for ${shieldMilestoneLabel}`,
+            shieldKey
+          );
+        }
+      }
+
+      // ── Shields: +1 for leveling up ────────────────────────────────────
+      if (xpResult?.leveledUp) {
+        const lvlShieldKey = `shield_levelup_${xpResult.newLevel}`;
+        await grantShield(
+          req.user.id, 1,
+          `Leveled up to ${xpResult.newLevelName}`,
+          lvlShieldKey
+        );
+      }
     }
 
-    return res.status(200).json(log);
+    return res.status(200).json({
+      ...log.toObject(),
+      xp: xpResult ? {
+        gained:       totalXpGained,
+        leveledUp:    xpResult.leveledUp,
+        newLevel:     xpResult.newLevel,
+        newLevelName: xpResult.newLevelName,
+        newTotalXp:   xpResult.newXp,
+      } : null,
+    });
   } catch (err) {
     console.error("[logHabit]", err);
     return res.status(500).json({ message: "Server error" });

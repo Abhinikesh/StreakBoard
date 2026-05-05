@@ -162,18 +162,31 @@ export const getMe = async (req, res) => {
 // ── PUT /api/auth/me ─────────────────────────────────────────
 /**
  * Protected route — updates the currently authenticated user's profile.
+ * Accepts: { name?, avatar? }. At least one field must be provided.
  */
 export const updateMe = async (req, res) => {
   try {
-    const { name } = req.body;
-    
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: "Name is required" });
+    const { name, avatar } = req.body;
+
+    // Build update object — only include fields that were sent
+    const updates = {};
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return res.status(400).json({ message: "Name cannot be empty" });
+      }
+      updates.name = name.trim();
+    }
+    if (avatar !== undefined) {
+      updates.avatar = avatar;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
     }
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { name: name.trim() },
+      updates,
       { new: true }
     ).select("-password -__v");
 

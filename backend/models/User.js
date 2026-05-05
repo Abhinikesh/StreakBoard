@@ -45,6 +45,62 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '21:00', // stored in UTC "HH:MM"
     },
+    // Global notification preferences (set by user in app settings)
+    emailNotificationsEnabled: {
+      type: Boolean,
+      default: true,   // opted-in by default; user can turn off
+    },
+    pushNotificationsEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    // Rate-limit: track the last date a global email was sent (YYYY-MM-DD UTC)
+    lastGlobalEmailSent: {
+      type: String,
+      default: null,
+    },
+    // ── XP / Level system ────────────────────────────────────────────────────
+    totalXp: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    currentLevel: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 10,
+    },
+    // Stores string keys for one-time XP milestones to prevent double-awarding.
+    // Examples: 'first_habit', 'friend_added_{friendId}', 'streak_7_{habitId}_{startDate}'
+    // Shield milestone keys also live here: 'shield_streak_7_{habitId}_{startDate}'
+    xpMilestonesHit: {
+      type: [String],
+      default: [],
+    },
+    // ── Streak Shield system ──────────────────────────────────────────────────
+    shieldCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 3,
+    },
+    shieldsUsedTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // ── Season badge gallery (up to 10 most recent) ────────────────────────────────
+    seasonBadges: {
+      type: [{
+        type:      { type: String, enum: ['champion','runner_up','podium','top10','participant'] },
+        season:    String,    // "May 2026 Season"
+        month:     String,    // "May 2026"
+        rank:      Number,
+        awardedAt: Date,
+      }],
+      default: [],
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

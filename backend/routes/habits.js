@@ -7,6 +7,7 @@ import {
   updateHabit,
   deleteHabit,
   markAllHabitsDone,
+  updateHabitReminder,
 } from "../controllers/habitController.js";
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.put("/:id", updateHabit);
 
 // DELETE /api/habits/:id   → soft-delete a habit
 router.delete("/:id", deleteHabit);
+
+// PATCH  /api/habits/:id/reminder → update per-habit reminder settings
+router.patch("/:id/reminder", updateHabitReminder);
 
 export default router;

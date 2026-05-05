@@ -25,8 +25,10 @@ const habitSchema = new mongoose.Schema(
       default: null, // "YYYY-MM-DD" — the day user started this habit
     },
     trackingPeriod: {
-      type: Number, // plain Number — accepts any value (7-365)
+      type: Number,
       default: 30,
+      min: 1,
+      max: 365,
     },
     isActive: {
       type: Boolean,
@@ -39,6 +41,8 @@ const habitSchema = new mongoose.Schema(
         habitName: { type: String },
       }
     ],
+    reminderEnabled: { type: Boolean, default: false },
+    reminderTime:    { type: String,  default: null }, // "HH:MM" 24h
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

@@ -10,6 +10,14 @@ import socialRoutes from "./routes/social.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import notificationRoutes from "./routes/notifications.js";
 import userRoutes from "./routes/user.js";
+import xpRoutes      from "./routes/xp.js";
+import shieldRoutes  from "./routes/shields.js";
+import seasonRoutes  from "./routes/seasons.js";
+import weeklyRoutes  from "./routes/weeklyChallenges.js";
+import fcRoutes      from "./routes/friendChallenges.js";
+import msgRoutes     from "./routes/messages.js";
+import { ensureActiveSeason } from "./lib/seasonUtils.js";
+import { ensureCurrentChallenge } from "./lib/weeklyChallenge.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
 
 // Load environment variables
@@ -49,6 +57,21 @@ app.use("/api/social", socialRoutes);
 app.use("/api/leaderboard",    leaderboardRoutes);
 app.use("/api/notifications",  notificationRoutes);
 app.use("/api/user",           userRoutes);
+app.use("/api/xp",            xpRoutes);
+app.use("/api/shields",       shieldRoutes);
+app.use("/api/seasons",           seasonRoutes);
+app.use("/api/weekly-challenge",  weeklyRoutes);
+app.use("/api/friend-challenges", fcRoutes);
+app.use("/api/messages",          msgRoutes);
+
+// ── Startup: ensure active season + weekly challenge ───────────────────────
+ensureActiveSeason()
+  .then((s) => console.log(`[Season] Active: ${s?.name ?? 'none'}`))
+  .catch((err) => console.error('[Season] init failed:', err.message));
+
+ensureCurrentChallenge()
+  .then((c) => console.log(`[WeeklyChallenge] Active: ${c?.title ?? 'none'}`))
+  .catch((err) => console.error('[WeeklyChallenge] init failed:', err.message));
 
 // ── Health check ───────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));

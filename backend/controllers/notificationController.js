@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import PushSubscription from '../models/PushSubscription.js';
 import Habit from '../models/Habit.js';
 import HabitLog from '../models/HabitLog.js';
+import NotificationLog from '../models/NotificationLog.js';
+import { sendDailyReminderEmail } from '../utils/mailer.js';
 
 // ── Initialize VAPID ──────────────────────────────────────────────────────────
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -277,8 +279,192 @@ export const sendGlobalReminders = async (type) => {
       }
     }
 
-    console.log(`✅ [GlobalReminder] ${type} done — sent: ${sent}, skipped (all done/no habits): ${skipped}`);
+};
+
+// ── GET /api/notifications/prefs  (protected) ─────────────────────────────────
+// Returns the user's email + push global notification preferences.
+export const getNotificationPrefs = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .select('emailNotificationsEnabled pushNotificationsEnabled');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({
+      emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+      pushNotificationsEnabled:  user.pushNotificationsEnabled  ?? true,
+    });
   } catch (err) {
-    console.error(`❌ [GlobalReminder] Error:`, err);
+    console.error('getNotificationPrefs error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── PATCH /api/notifications/prefs  (protected) ───────────────────────────────
+// Saves the user's email + push global notification opt-in/out to DB.
+export const updateNotificationPrefs = async (req, res) => {
+  try {
+    const { emailNotificationsEnabled, pushNotificationsEnabled } = req.body;
+    const update = {};
+    if (emailNotificationsEnabled !== undefined) update.emailNotificationsEnabled = !!emailNotificationsEnabled;
+    if (pushNotificationsEnabled  !== undefined) update.pushNotificationsEnabled  = !!pushNotificationsEnabled;
+    if (!Object.keys(update).length) return res.status(400).json({ message: 'No fields to update' });
+
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: update },
+      { new: true, select: 'emailNotificationsEnabled pushNotificationsEnabled' }
+    );
+    res.json({
+      emailNotificationsEnabled: updated.emailNotificationsEnabled,
+      pushNotificationsEnabled:  updated.pushNotificationsEnabled,
+    });
+  } catch (err) {
+    console.error('updateNotificationPrefs error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── GET /api/notifications/unsubscribe-email  (public, no auth) ───────────────
+// One-click unsubscribe from the email footer link.
+// Token = base64url-encoded userId. Sets emailNotificationsEnabled=false.
+export const handleEmailUnsubscribe = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).send('Invalid unsubscribe link.');
+
+    const userId = Buffer.from(token, 'base64url').toString('utf8');
+    await User.findByIdAndUpdate(userId, { $set: { emailNotificationsEnabled: false } });
+
+    // Friendly HTML confirmation page
+    res.send(`
+      <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+      <title>Unsubscribed — StreakBoard</title>
+      <style>body{font-family:sans-serif;background:#0d0d1a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{background:#13131f;border-radius:16px;padding:40px;max-width:420px;text-align:center;border:1px solid rgba(255,255,255,0.08);}
+      h2{color:#7c3aed;}p{color:rgba(255,255,255,0.6);line-height:1.6;}</style></head>
+      <body><div class="card"><h2>✅ Unsubscribed</h2>
+      <p>You've been removed from StreakBoard daily reminder emails. You can re-enable them anytime in the app's Profile settings.</p>
+      </div></body></html>
+    `);
+  } catch (err) {
+    console.error('handleEmailUnsubscribe error:', err);
+    res.status(400).send('Invalid or expired unsubscribe link.');
+  }
+};
+
+// ── sendDailyGlobalNotification  (called by cron at 19:00 UTC) ────────────────
+/**
+ * Queries all users who have NOT logged any habit today, then:
+ *  1. Sends a web-push notification (if pushNotificationsEnabled).
+ *  2. Sends a reminder email (if emailNotificationsEnabled + not already sent today).
+ *  3. Logs every attempt to NotificationLog for debugging.
+ *
+ * Skips:
+ *  - Users who have already logged at least one habit today.
+ *  - Users opted out of push / email.
+ *  - Users who already received a global email today (rate-limit).
+ */
+export const sendDailyGlobalNotification = async () => {
+  const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+  console.log(`[GlobalDaily] Starting daily global notification run for ${today}`);
+
+  const PUSH_MESSAGES = [
+    { title: "Don't break your streak! 🔥", body: "You haven't logged anything today. 30 seconds is all it takes! ✅" },
+    { title: "Don't break your streak! 🔥", body: 'Your habits are waiting for you 💪 Log something before midnight!' },
+    { title: "Don't break your streak! 🔥", body: "Today's not over yet! Mark your habits and keep that streak alive 🔥" },
+    { title: "Don't break your streak! 🔥", body: "Quick check-in time! ⚡ Don't let today slip by without logging." },
+  ];
+
+  try {
+    // All active users — lean for performance
+    const allUsers = await User.find({}).select(
+      '_id name email emailNotificationsEnabled pushNotificationsEnabled lastGlobalEmailSent reminderEnabled'
+    ).lean();
+
+    let pushSent = 0, pushSkipped = 0, emailSent = 0, emailSkipped = 0;
+
+    for (const user of allUsers) {
+      const uid = user._id.toString();
+
+      // ── Check if user has logged ANY habit today ──────────────────────────
+      const loggedToday = await HabitLog.exists({ userId: user._id, date: today });
+      if (loggedToday) {
+        // User is already active today — skip entirely
+        await NotificationLog.create({ userId: user._id, type: 'push',  status: 'skipped', reason: 'logged today' });
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'skipped', reason: 'logged today' });
+        continue;
+      }
+
+      // ── 1. Push notification ──────────────────────────────────────────────
+      if (user.pushNotificationsEnabled !== false) {
+        const msg  = PUSH_MESSAGES[Math.floor(Math.random() * PUSH_MESSAGES.length)];
+        const payload = JSON.stringify({
+          title:    msg.title,
+          body:     msg.body,
+          icon:     '/icon-192.png',
+          badge:    '/icon-192.png',
+          tag:      'daily-global',
+          renotify: true,
+          data:     { url: '/dashboard' },
+        });
+
+        const subs = await PushSubscription.find({ userId: user._id }).lean();
+        if (subs.length === 0) {
+          await NotificationLog.create({ userId: user._id, type: 'push', status: 'skipped', reason: 'no subscriptions' });
+        } else {
+          for (const sub of subs) {
+            try {
+              await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
+              pushSent++;
+            } catch (pushErr) {
+              if (pushErr.statusCode === 404 || pushErr.statusCode === 410) {
+                await PushSubscription.deleteOne({ _id: sub._id });
+              }
+              await NotificationLog.create({ userId: user._id, type: 'push', status: 'failed', reason: pushErr.message });
+            }
+          }
+          await NotificationLog.create({ userId: user._id, type: 'push', status: 'sent' });
+        }
+      } else {
+        pushSkipped++;
+        await NotificationLog.create({ userId: user._id, type: 'push', status: 'skipped', reason: 'opted out' });
+      }
+
+      // ── 2. Email notification ─────────────────────────────────────────────
+      // Rate-limit: max 1 global email per user per day
+      if (user.lastGlobalEmailSent === today) {
+        emailSkipped++;
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'skipped', reason: 'already sent today' });
+        continue;
+      }
+
+      if (user.emailNotificationsEnabled === false) {
+        emailSkipped++;
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'skipped', reason: 'opted out' });
+        continue;
+      }
+
+      if (!user.email) {
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'skipped', reason: 'no email address' });
+        continue;
+      }
+
+      try {
+        await sendDailyReminderEmail(user);
+        // Record send date for rate-limiting
+        await User.updateOne({ _id: user._id }, { $set: { lastGlobalEmailSent: today } });
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'sent' });
+        emailSent++;
+      } catch (_emailErr) {
+        await NotificationLog.create({ userId: user._id, type: 'email', status: 'failed', reason: _emailErr.message });
+      }
+    }
+
+    console.log(
+      `[GlobalDaily] Done — push sent: ${pushSent}, push skipped: ${pushSkipped}, ` +
+      `email sent: ${emailSent}, email skipped: ${emailSkipped}`
+    );
+  } catch (err) {
+    console.error('[GlobalDaily] Fatal error:', err);
   }
 };
