@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Habit from '../models/Habit.js';
 import HabitLog from '../models/HabitLog.js';
+import { grantXp, getLevelInfo } from '../lib/xp.js';
 
 // ── POST /api/social/enable ────────────────────────────────────
 export const enableSharing = async (req, res) => {
@@ -122,11 +123,16 @@ export const getPublicProfile = async (req, res) => {
 
     const uniqueActiveDays = [...new Set(doneLogs.map(l => l.date))].length;
 
+    // Calculate level info from user's XP
+    const { current: levelData } = getLevelInfo(user.totalXp || 0);
+
     // Return ONLY aggregate stats — no habit names, icons, logs, email, or friends
     res.json({
-      name: user.name || 'StreakBoard User',
-      avatar: user.avatar || null,
+      name:        user.name || 'StreakBoard User',
+      avatar:      user.avatar || null,
       memberSince: user.createdAt,
+      currentLevel:  levelData.level,
+      levelName:     levelData.name,
       stats: {
         totalHabits: habits.length,
         totalDone,
@@ -134,8 +140,6 @@ export const getPublicProfile = async (req, res) => {
         overallRate,
         activeDays: uniqueActiveDays,
       },
-      // habits array intentionally omitted — privacy
-      // logs array intentionally omitted — privacy
     });
   } catch (err) {
     console.error('getPublicProfile error:', err);
@@ -157,6 +161,10 @@ export const addFriend = async (req, res) => {
     }
 
     await User.findByIdAndUpdate(req.user.id, { $addToSet: { friends: friend._id } });
+
+    // XP: +10 for adding a new friend (one-time per friendship)
+    await grantXp(req.user.id, 10, `Added friend ${friend.name}`, `friend_added_${friend._id}`);
+
     return res.status(200).json({ message: 'Friend added', friend: { name: friend.name, shareCode: friend.shareCode } });
   } catch (err) {
     console.error('[addFriend]', err);
@@ -213,7 +221,7 @@ export const getLeaderboard = async (req, res) => {
     const users = await User.find({
       isProfilePublic: true,
       shareCode: { $exists: true, $ne: null, $nin: ['', null] },
-    }).select('name avatar shareCode createdAt');
+    }).select('name avatar shareCode createdAt totalXp currentLevel');
 
     const leaderboardData = await Promise.all(
       users.map(async (user) => {
@@ -281,24 +289,128 @@ export const getLeaderboard = async (req, res) => {
         });
 
         return {
-          name: user.name || 'StreakBoard User',
-          avatar: user.avatar || null,
-          shareCode: user.shareCode,
-          totalHabits: habits.length,
+          _id:           user._id,
+          name:          user.name || 'StreakBoard User',
+          avatar:        user.avatar || null,
+          shareCode:     user.shareCode,
+          totalHabits:   habits.length,
           totalDone,
+          currentStreak: longestStreak,
+          streak:        longestStreak,
+          completionRate: overallRate,
           overallRate,
-          longestStreak,
-          memberSince: user.createdAt,
+          memberSince:   user.createdAt,
+          currentLevel:  user.currentLevel || 1,
+          totalXp:       user.totalXp || 0,
         };
       })
     );
 
-    // Sort by longestStreak descending
-    leaderboardData.sort((a, b) => b.longestStreak - a.longestStreak);
+    // Sort by currentStreak descending
+    leaderboardData.sort((a, b) => b.currentStreak - a.currentStreak);
 
     res.json(leaderboardData);
   } catch (err) {
     console.error('getLeaderboard error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── GET /api/social/profile/:userId (AUTHENTICATED) ───────────
+// Lets any logged-in user view a leaderboard member's public profile
+// by their MongoDB _id — no shareCode required.
+export const getProfileById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Basic ObjectId sanity check
+    if (!userId || !/^[a-f\d]{24}$/i.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Only expose profiles that are public OR the requester is viewing their own
+    const isSelf = req.user?.id && req.user.id.toString() === userId;
+    if (!user.isProfilePublic && !isSelf) {
+      return res.status(404).json({ message: 'Profile is private' });
+    }
+
+    // Query habits and logs for stats
+    const habits = await Habit.find({ userId: user._id, isActive: true })
+      .select('_id name icon trackingPeriod')
+      .lean();
+
+    const habitIds = habits.map(h => h._id);
+
+    const logs = await HabitLog.find({
+      userId: user._id,
+      habitId: { $in: habitIds },
+    })
+      .select('habitId date status')
+      .lean();
+
+    // Aggregate stats
+    const doneLogs   = logs.filter(l => l.status === 'done');
+    const missedLogs = logs.filter(l => l.status === 'missed');
+    const totalDone  = doneLogs.length;
+    const totalMissed = missedLogs.length;
+    const overallRate = (totalDone + totalMissed) > 0
+      ? Math.round((totalDone / (totalDone + totalMissed)) * 100)
+      : 0;
+
+    const pad    = n => String(n).padStart(2, '0');
+    const toStr  = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const now    = new Date();
+    const todayStr = toStr(now);
+    const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+    const yesterdayStr = toStr(yest);
+
+    let longestStreak = 0;
+    habitIds.forEach(habitId => {
+      const habitLoggedDates = new Set(
+        logs
+          .filter(l => l.habitId.toString() === habitId.toString())
+          .map(l => l.date)
+      );
+      if (!habitLoggedDates.has(todayStr) && !habitLoggedDates.has(yesterdayStr)) return;
+      const startDate = habitLoggedDates.has(todayStr) ? new Date(now) : new Date(yest);
+      let run = 0;
+      const cur = new Date(startDate);
+      while (true) {
+        const ds = toStr(cur);
+        if (habitLoggedDates.has(ds)) { run++; cur.setDate(cur.getDate() - 1); }
+        else break;
+      }
+      if (run > longestStreak) longestStreak = run;
+    });
+
+    const uniqueActiveDays = [...new Set(doneLogs.map(l => l.date))].length;
+
+    // Level info (getLevelInfo is already imported at the top of this file)
+    const { current: levelData } = getLevelInfo(user.totalXp || 0);
+
+    res.json({
+      name:         user.name || 'StreakBoard User',
+      avatar:       user.avatar || null,
+      shareCode:    user.shareCode || null,
+      createdAt:    user.createdAt,
+      currentLevel: levelData.level,
+      levelName:    levelData.name,
+      currentStreak: longestStreak,
+      stats: {
+        totalHabits:   habits.length,
+        totalDone,
+        longestStreak,
+        overallRate,
+        activeDays:    uniqueActiveDays,
+      },
+    });
+  } catch (err) {
+    console.error('getProfileById error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
