@@ -1,5 +1,6 @@
 import HabitLog from "../models/HabitLog.js";
 import Habit from "../models/Habit.js";
+import User from "../models/User.js";
 import mongoose from "mongoose";
 import { grantXp, getStreakMilestone } from '../lib/xp.js';
 import { grantShield } from '../lib/shields.js';
@@ -71,6 +72,14 @@ export const logHabit = async (req, res) => {
       { $set: setFields },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
+
+    // ── Dismiss streak-at-risk alert for today ──────────────────────────────
+    // If the user logs any habit (done or missed), they clearly opened the app.
+    // Mark today so the 9 PM streak-at-risk cron skips them for the rest of the day.
+    // Fire-and-forget — never block the log response on this.
+    const todayUTC = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+    User.findByIdAndUpdate(req.user.id, { lastStreakAtRiskAlert: todayUTC })
+      .catch(() => {}); // silent — not critical path
 
     // ── Badge: award 100-day streak badge if earned ──
     let xpResult = null;   // accumulates level-up info for response

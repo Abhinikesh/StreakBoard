@@ -43,7 +43,16 @@ export const requestOTP = async (req, res) => {
     }
     // If user already exists (Google or OTP), skip create — just send the OTP.
 
-    await sendOTPEmail(normalizedEmail);
+    try {
+      await sendOTPEmail(normalizedEmail);
+    } catch (emailErr) {
+      // sendOTPEmail now throws on failure — return 503 so the app shows
+      // a real error instead of advancing to the OTP entry screen.
+      console.error('[requestOTP] Email send failed:', emailErr.message);
+      return res.status(503).json({
+        message: 'Could not send verification email. Please check your email address and try again.',
+      });
+    }
 
     return res.status(200).json({ message: "OTP sent" });
   } catch (err) {
@@ -166,42 +175,39 @@ export const getMe = async (req, res) => {
  */
 export const updateMe = async (req, res) => {
   try {
-    const { name, avatar } = req.body;
+    const { name, avatar, bio, bannerColor, pinnedBadge } = req.body;
 
-    // Build update object — only include fields that were sent
     const updates = {};
     if (name !== undefined) {
-      if (!name.trim()) {
-        return res.status(400).json({ message: "Name cannot be empty" });
-      }
+      if (!name.trim()) return res.status(400).json({ message: 'Name cannot be empty' });
       updates.name = name.trim();
     }
-    if (avatar !== undefined) {
-      updates.avatar = avatar;
+    if (avatar !== undefined) updates.avatar = avatar;
+    if (bio !== undefined) {
+      if (bio && bio.length > 120)
+        return res.status(400).json({ message: 'Bio cannot exceed 120 characters' });
+      updates.bio = bio?.trim() || null;
     }
+    if (bannerColor !== undefined) updates.bannerColor = bannerColor || null;
+    if (pinnedBadge  !== undefined) updates.pinnedBadge = pinnedBadge  || null;
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "No fields to update" });
-    }
+    if (Object.keys(updates).length === 0)
+      return res.status(400).json({ message: 'No fields to update' });
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      updates,
-      { new: true }
-    ).select("-password -__v");
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).select('-password -__v');
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     return res.status(200).json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
+      id:          user._id,
+      name:        user.name,
+      email:       user.email,
+      avatar:      user.avatar,
+      bio:         user.bio,
+      bannerColor: user.bannerColor,
+      pinnedBadge: user.pinnedBadge,
     });
   } catch (err) {
-    console.error("[updateMe]", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error('[updateMe]', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };

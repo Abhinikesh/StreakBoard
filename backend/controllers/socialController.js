@@ -131,6 +131,9 @@ export const getPublicProfile = async (req, res) => {
       name:        user.name || 'StreakBoard User',
       avatar:      user.avatar || null,
       memberSince: user.createdAt,
+      bio:         user.bio         || null,
+      bannerColor: user.bannerColor || null,
+      pinnedBadge: user.pinnedBadge?.icon ? user.pinnedBadge : null,
       currentLevel:  levelData.level,
       levelName:     levelData.name,
       stats: {
@@ -160,7 +163,13 @@ export const addFriend = async (req, res) => {
       return res.status(400).json({ message: 'Cannot add yourself' });
     }
 
-    await User.findByIdAndUpdate(req.user.id, { $addToSet: { friends: friend._id } });
+    // Bidirectional: both users get each other in their friends list so either
+    // side can initiate messages (the message-send friends-only check requires
+    // the SENDER to have the receiver in their own friends list).
+    await Promise.all([
+      User.findByIdAndUpdate(req.user.id,  { $addToSet: { friends: friend._id } }),
+      User.findByIdAndUpdate(friend._id,   { $addToSet: { friends: req.user.id } }),
+    ]);
 
     // XP: +10 for adding a new friend (one-time per friendship)
     await grantXp(req.user.id, 10, `Added friend ${friend.name}`, `friend_added_${friend._id}`);
@@ -317,8 +326,12 @@ export const getLeaderboard = async (req, res) => {
 };
 
 // ── GET /api/social/profile/:userId (AUTHENTICATED) ───────────
-// Lets any logged-in user view a leaderboard member's public profile
+// Lets any logged-in user view a leaderboard member's public stats
 // by their MongoDB _id — no shareCode required.
+// NOTE: We intentionally do NOT gate on isProfilePublic here.
+// The leaderboard already filters to public users. Season leaderboard
+// entries may include users who appear without isProfilePublic, so
+// blocking on that flag causes false 404s.
 export const getProfileById = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -331,12 +344,6 @@ export const getProfileById = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Only expose profiles that are public OR the requester is viewing their own
-    const isSelf = req.user?.id && req.user.id.toString() === userId;
-    if (!user.isProfilePublic && !isSelf) {
-      return res.status(404).json({ message: 'Profile is private' });
     }
 
     // Query habits and logs for stats
@@ -398,6 +405,9 @@ export const getProfileById = async (req, res) => {
       avatar:       user.avatar || null,
       shareCode:    user.shareCode || null,
       createdAt:    user.createdAt,
+      bio:          user.bio         || null,
+      bannerColor:  user.bannerColor || null,
+      pinnedBadge:  user.pinnedBadge?.icon ? user.pinnedBadge : null,
       currentLevel: levelData.level,
       levelName:    levelData.name,
       currentStreak: longestStreak,

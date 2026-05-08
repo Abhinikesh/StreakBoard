@@ -51,7 +51,7 @@ export const getHabits = async (req, res) => {
     const habits = await Habit.find({
       userId: req.user.id,
       isActive: true,
-    }).sort({ createdAt: 1 });
+    }).sort({ sortOrder: 1, createdAt: 1 }); // user-defined order, then creation date
 
     return res.status(200).json(habits);
   } catch (err) {
@@ -205,3 +205,28 @@ export const updateHabitReminder = async (req, res) => {
   }
 };
 
+// ── PATCH /api/habits/reorder ───────────────────────────────────────────────
+/**
+ * Bulk-update sortOrder after drag-to-reorder.
+ * Body: { order: [{ id: string, sortOrder: number }] }
+ */
+export const reorderHabits = async (req, res) => {
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order) || !order.length) {
+      return res.status(400).json({ message: 'order array is required' });
+    }
+    await Habit.bulkWrite(
+      order.map(({ id, sortOrder }) => ({
+        updateOne: {
+          filter: { _id: id, userId: req.user.id },
+          update: { $set: { sortOrder: Number(sortOrder) } },
+        },
+      }))
+    );
+    return res.json({ message: 'Order saved' });
+  } catch (err) {
+    console.error('[reorderHabits]', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};

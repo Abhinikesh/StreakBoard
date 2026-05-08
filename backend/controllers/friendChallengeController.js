@@ -36,13 +36,22 @@ async function distributeRewards(challenge) {
       await grantXp(winnerId, 50, `Won friend challenge: ${challenge.habitName}`, key);
     }
 
-    // Challenger badge (5+ / 7 days)
+    // Badge for participants who logged 5+ / 7 days
+    // NOTE: badge type must be one of the enum values in User.seasonBadges schema.
+    // 'challenger' is NOT valid — use 'participant' instead.
+    const monthLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
     for (const [uid, days] of [[challenge.challengerId, cDays], [challenge.challengedId, eDays]]) {
       if (days >= 5) {
         await User.findByIdAndUpdate(uid, {
           $push: {
             seasonBadges: {
-              $each: [{ type: 'challenger', season: `Challenge: ${challenge.habitName}`, awardedAt: new Date(), rank: 0 }],
+              $each: [{
+                type:      'participant',               // ← valid enum value
+                season:    `Challenge: ${challenge.habitName}`,
+                month:     monthLabel,
+                awardedAt: new Date(),
+                rank:      0,
+              }],
               $slice: -10,
             },
           },
@@ -51,6 +60,7 @@ async function distributeRewards(challenge) {
     }
 
     await FriendChallenge.findByIdAndUpdate(challenge._id, { rewardDistributed: true });
+    console.log('[FC distributeRewards] done for challenge:', challenge._id);
   } catch (err) {
     console.error('[FC distributeRewards]', err.message);
   }
@@ -76,8 +86,15 @@ export const createChallenge = async (req, res) => {
     const { friendId, habitName } = req.body;
     const userId = req.user.id;
 
+    console.log('[createChallenge] payload:', { userId, friendId, habitName });
+
     if (!friendId || !habitName?.trim())
       return res.status(400).json({ message: 'friendId and habitName are required.' });
+
+    // Verify the challenged user exists
+    const friend = await User.findById(friendId).select('name').lean();
+    if (!friend)
+      return res.status(404).json({ message: 'Friend not found.' });
 
     // Max 3 active per user
     const activeCount = await FriendChallenge.countDocuments({
@@ -87,7 +104,7 @@ export const createChallenge = async (req, res) => {
     if (activeCount >= 3)
       return res.status(400).json({ message: 'You already have 3 active challenges. Complete one before creating another.' });
 
-    // 1 challenge per friend pair
+    // 1 challenge per friend pair at a time
     const dupe = await FriendChallenge.findOne({
       $or: [
         { challengerId: userId, challengedId: friendId },
@@ -96,7 +113,7 @@ export const createChallenge = async (req, res) => {
       status: { $in: ['pending', 'active'] },
     });
     if (dupe)
-      return res.status(400).json({ message: 'You already have an active challenge with this friend.' });
+      return res.status(400).json({ message: `You already have a ${dupe.status} challenge with this friend. Wait for them to respond or for it to expire.` });
 
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const challenge = await FriendChallenge.create({
@@ -106,13 +123,16 @@ export const createChallenge = async (req, res) => {
       expiresAt,
     });
 
+    // Null-safe: look up challenger name for the push notification
     const challenger = await User.findById(userId).select('name').lean();
+    const challengerName = challenger?.name ?? 'Someone';
     await pushTo(friendId, '🤜 New Challenge!',
-      `${challenger.name} challenged you to "${habitName.trim()}" for 7 days! Open the app to respond.`);
+      `${challengerName} challenged you to "${habitName.trim()}" for 7 days! Open the app to respond.`);
 
+    console.log('[createChallenge] created:', challenge._id);
     res.status(201).json(challenge);
   } catch (err) {
-    console.error('[createChallenge]', err);
+    console.error('[createChallenge] error:', err.message, err);
     res.status(500).json({ message: 'Server error' });
   }
 };

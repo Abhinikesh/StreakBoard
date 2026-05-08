@@ -8,6 +8,8 @@ import ShieldEvent from '../models/ShieldEvent.js';
 import { sendFriendDigest, sendGlobalReminders, sendDailyGlobalNotification } from '../controllers/notificationController.js';
 import { runSeasonReset } from '../lib/seasonUtils.js';
 import { runWeeklyReset } from '../lib/weeklyChallenge.js';
+import { runStreakAtRiskCheck } from './streakAtRiskJob.js';
+import { runWeeklySummary } from './weeklySummaryJob.js';
 
 // reminderTime is stored in UTC. On the frontend, the user sees their local
 // time converted to UTC before saving. See useNotifications hook for conversion.
@@ -73,6 +75,16 @@ export function startReminderJob() {
               }
             }
           }
+
+          // ── Streak-at-risk: if this user's reminderTime is at or after
+          // 15:30 UTC (9 PM IST), piggyback the streak-at-risk check here
+          // so late-reminder users get the alert at their preferred time.
+          // Users with reminderTime < 15:30 UTC are covered by the 15:30 cron.
+          if (user.reminderTime >= '15:30') {
+            runStreakAtRiskCheck(user._id.toString()).catch(err =>
+              console.error('[ReminderJob] StreakAtRisk side-run error:', err.message)
+            );
+          }
         }
       }
 
@@ -115,11 +127,33 @@ export function startReminderJob() {
     sendDailyGlobalNotification();
   });
 
+  // ── 15:30 UTC (9 PM IST) — Streak-at-risk alerts ─────────────────────
+  // Sends "Your streak is at risk" to users with streak ≥ 3 who haven't
+  // logged any habit yet today. One alert per user per day max.
+  // Users whose personal reminderTime is ≥ 15:30 UTC are handled in the
+  // per-minute cron above so they receive it at their preferred time.
+  cron.schedule('30 15 * * *', () => {
+    console.log('⚠️  [StreakAtRisk] 15:30 UTC — running streak-at-risk check');
+    runStreakAtRiskCheck().catch(err =>
+      console.error('[StreakAtRisk] Cron error:', err.message)
+    );
+  });
+
   // ── 00:05 UTC every Monday — Weekly challenge reset ───────────────────
   cron.schedule('5 0 * * 1', async () => {
     console.log('🏆 [WeeklyCron] Monday 00:05 UTC — rotating weekly challenge');
     try { await runWeeklyReset(); }
     catch (err) { console.error('[WeeklyCron] fatal:', err.message); }
+  });
+
+  // ── 14:30 UTC every Sunday (8 PM IST) — Weekly summary push + email ────
+  // Sends each user their Mon–Sun stats. One summary per user per Sunday
+  // (deduped via lastWeeklySummaryDate on the User model).
+  cron.schedule('30 14 * * 0', () => {
+    console.log('📊 [WeeklySummary] 14:30 UTC Sunday — running weekly summary job');
+    runWeeklySummary().catch(err =>
+      console.error('[WeeklySummary] Cron error:', err.message)
+    );
   });
 
   // ── 00:05 UTC on 1st of month — Season reset ──────────────────────────

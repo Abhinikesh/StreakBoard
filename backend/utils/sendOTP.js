@@ -2,53 +2,83 @@ import nodemailer from "nodemailer";
 
 // ── In-memory OTP store ────────────────────────────────────────
 // Structure: Map<email, { otp: string, expiresAt: number }>
+// NOTE: This store is cleared on server restart (Render free-tier spins down
+// after 15 min of inactivity). If OTPs expire on restart, the user simply
+// taps "Resend code" on the login screen to get a fresh one.
 const otpStore = new Map();
 
 // ── Nodemailer transporter ─────────────────────────────────────
+// IMPORTANT: EMAIL_PASS must be a Gmail App Password, NOT your real Gmail
+// password. Gmail has blocked plain-password SMTP since May 2022.
+//
+// How to get an App Password:
+//   1. Go to myaccount.google.com → Security
+//   2. Enable 2-Step Verification (required)
+//   3. Go to App Passwords → create one for "Mail" / "Other (StreakBoard)"
+//   4. Copy the 16-character password (e.g. "abcd efgh ijkl mnop")
+//   5. Set EMAIL_PASS=abcdefghijklmnop in your .env / Render env vars
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Gmail App Password
+    pass: process.env.EMAIL_PASS, // ← must be Gmail App Password, not account password
   },
 });
 
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('[EMAIL] SMTP failed:', error.message);
+  } else {
+    console.log('[EMAIL] SMTP ready to send emails');
+  }
+});
+
 /**
- * Generates a 6-digit numeric OTP, stores it in memory,
- * and sends it to the given email address.
+ * Generates a 6-digit numeric OTP, sends it to the given email address,
+ * and only stores it in memory AFTER the email sends successfully.
+ *
+ * Throws if email send fails — so the caller can return a real 5xx error
+ * to the client instead of a false 200 OK.
+ *
  * @param {string} email
  */
 export const sendOTPEmail = async (email) => {
-  // Generate a random 6-digit OTP
   const otp = String(Math.floor(100000 + Math.random() * 900000));
-  console.log(`🔑 OTP for ${email}: ${otp}`); // visible in Render logs
-
-  // Store with 10-minute expiry
-  otpStore.set(email, {
-    otp,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-
-  const mailOptions = {
-    from: `"StreakBoard" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Your StreakBoard Login OTP",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
-        <h2 style="color:#4f46e5;margin-bottom:8px;">🔐 Your One-Time Password</h2>
-        <p style="color:#374151;font-size:15px;">Use the code below to log in to <strong>StreakBoard</strong>. It expires in <strong>10 minutes</strong>.</p>
-        <div style="font-size:36px;font-weight:700;letter-spacing:8px;color:#111827;margin:24px 0;text-align:center;">${otp}</div>
-        <p style="color:#6b7280;font-size:13px;">If you didn't request this, you can safely ignore this email.</p>
-      </div>
-    `,
-  };
 
   try {
-    await transporter.sendMail(mailOptions);
-  } catch (mailErr) {
-    // Log the error but don't throw — OTP is already stored.
-    // The user can retrieve it from Render logs until a valid App Password is configured.
-    console.error('[sendOTPEmail] Gmail send failed (check EMAIL_PASS is a Gmail App Password):', mailErr.message);
+    await transporter.sendMail({
+      from: `"StreakBoard" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your StreakBoard sign-in code',
+      html: `
+        <div style="font-family: sans-serif; max-width: 400px;">
+          <h2 style="color: #7C3AED;">Your sign-in code</h2>
+          <p>Use this code to sign in:</p>
+          <div style="background: #F3F4F6; padding: 24px; 
+                      text-align: center; border-radius: 8px;">
+            <span style="font-size: 36px; font-weight: 700; 
+                         letter-spacing: 8px; color: #7C3AED;">
+              ${otp}
+            </span>
+          </div>
+          <p style="color: #666; font-size: 14px;">
+            Expires in 10 minutes. Do not share this code.
+          </p>
+        </div>
+      `,
+    });
+    console.log('[EMAIL] OTP sent successfully to:', email);
+    
+    // Only store the OTP *after* the email successfully sends.
+    otpStore.set(email, {
+      otp,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    });
+
+    return true;
+  } catch (err) {
+    console.error('[EMAIL] Failed to send OTP:', err.message);
+    throw err;
   }
 };
 
@@ -77,3 +107,4 @@ export const verifyOTP = (email, otp) => {
   otpStore.delete(email);
   return true;
 };
+

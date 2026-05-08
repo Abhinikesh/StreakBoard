@@ -43,6 +43,7 @@ const habitSchema = new mongoose.Schema(
     ],
     reminderEnabled: { type: Boolean, default: false },
     reminderTime:    { type: String,  default: null }, // "HH:MM" 24h
+    sortOrder:       { type: Number,  default: 0 },    // user-defined display order
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

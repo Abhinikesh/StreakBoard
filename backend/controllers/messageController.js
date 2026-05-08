@@ -98,9 +98,18 @@ export const sendMessage = async (req, res) => {
     if (senderId === receiverId)
       return res.status(400).json({ message: 'Cannot message yourself.' });
 
-    // Friends-only check
-    const me = await User.findById(senderId).select('friends name').lean();
-    if (!me?.friends?.some(f => f.toString() === receiverId))
+    // Friends check — symmetric: either side having the other in their list is enough.
+    // This handles friendships created before the bidirectional fix as well.
+    const [me, them] = await Promise.all([
+      User.findById(senderId).select('friends name').lean(),
+      User.findById(receiverId).select('friends').lean(),
+    ]);
+    if (!me) return res.status(404).json({ message: 'Sender not found.' });
+    if (!them) return res.status(404).json({ message: 'Recipient not found.' });
+
+    const senderKnowsThem   = me?.friends?.some(f => f.toString() === receiverId);
+    const receiverKnowsMe   = them?.friends?.some(f => f.toString() === senderId);
+    if (!senderKnowsThem && !receiverKnowsMe)
       return res.status(403).json({ message: 'You can only message friends.' });
 
     // Block check

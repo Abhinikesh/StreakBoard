@@ -101,6 +101,37 @@ const userSchema = new mongoose.Schema(
       }],
       default: [],
     },
+
+    // ── Streak-at-risk notification dedup ───────────────────────────────────
+    // Stores the UTC date (YYYY-MM-DD) when the last streak-at-risk alert was sent.
+    // Prevents sending more than one alert per day per user.
+    lastStreakAtRiskAlert: {
+      type:    String,
+      default: null,
+    },
+
+    // ── Weekly summary dedup ────────────────────────────────────────────────
+    // Stores the Sunday UTC date (YYYY-MM-DD) when the last weekly summary was sent.
+    // Prevents duplicate summaries if the cron fires more than once on Sunday.
+    lastWeeklySummaryDate: {
+      type:    String,
+      default: null,
+    },
+    // ── Public profile customisation ────────────────────────────────────────
+    bio: {
+      type:      String,
+      default:   null,
+      maxlength: 120,
+    },
+    bannerColor: {
+      type:    String,
+      default: null, // e.g. "#7C3AED"; null → use app default purple
+    },
+    pinnedBadge: {
+      icon:  { type: String, default: null },
+      label: { type: String, default: null },
+      _id:   false,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
