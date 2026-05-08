@@ -81,13 +81,3 @@ export const getStreakMilestone = (streakCount) => {
   return null;
 };
 
-export const getStreakMilestone = (streakCount) => {
-  if (streakCount === 3)  return { xp: 50,  label: "3 Day Streak" };
-  if (streakCount === 7)  return { xp: 100, label: "7 Day Streak" };
-  if (streakCount === 14) return { xp: 200, label: "14 Day Streak" };
-  if (streakCount === 30) return { xp: 500, label: "30 Day Streak" };
-  if (streakCount > 30 && streakCount % 30 === 0) {
-    return { xp: 500, label: `${streakCount} Day Streak` };
-  }
-  return null;
-};
