@@ -278,7 +278,9 @@ export const sendGlobalReminders = async (type) => {
         }
       }
     }
-
+  } catch (err) {
+    console.error('[sendGlobalReminders] Error:', err);
+  }
 };
 
 // ── GET /api/notifications/prefs  (protected) ─────────────────────────────────

@@ -1,32 +1,38 @@
-import mongoose from 'mongoose';
+import { supabase } from '../config/supabaseClient.js';
 
-/**
- * XpEvent — one record per XP award.
- * Provides the "XP history" feed shown in XpDetailScreen.
- * TTL-indexed after 180 days to keep the collection bounded.
- */
-const xpEventSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
-    reason: {
-      type: String,
-      required: true,
-      maxlength: 120,
-    },
+export const XpEvent = {
+  async create({ userId, xpAmount, reason }) {
+    const { data, error } = await supabase
+      .from('xp_events')
+      .insert({
+        user_id: userId,
+        xp_amount: xpAmount,
+        reason: reason,
+        earned_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
-);
 
-xpEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });
+  async getByUser(userId, limit = 20) {
+    const { data, error } = await supabase
+      .from('xp_events')
+      .select('*')
+      .eq('user_id', userId)
+      .order('earned_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  },
 
-export default mongoose.model('XpEvent', xpEventSchema);
+  async getTotalXp(userId) {
+    const { data, error } = await supabase
+      .from('xp_events')
+      .select('xp_amount')
+      .eq('user_id', userId);
+    if (error) throw error;
+    return (data ?? []).reduce((sum, e) => sum + (e.xp_amount || 0), 0);
+  },
+};
