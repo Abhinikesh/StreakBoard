@@ -44,7 +44,7 @@ export async function grantXp(userId, amount, reason, milestoneKey = null) {
     if (!old) return null;
     const oldLevel = old.currentLevel || 1;
 
-    await XpEvent.create({ userId, amount, reason: reason.slice(0, 120) });
+    await XpEvent.create({ userId, amount, reason: (reason || '').slice(0, 120) });
 
     const updateOp = { $inc: { totalXp: amount } };
     if (milestoneKey) updateOp.$addToSet = { xpMilestonesHit: milestoneKey };
