@@ -335,6 +335,7 @@ export const getLeaderboard = async (req, res) => {
 export const getProfileById = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log('[PublicProfile] Fetching userId:', req.params.userId);
 
     // Basic ObjectId sanity check
     if (!userId || !/^[a-f\d]{24}$/i.test(userId)) {
@@ -400,7 +401,20 @@ export const getProfileById = async (req, res) => {
     // Level info (getLevelInfo is already imported at the top of this file)
     const { current: levelData } = getLevelInfo(user.totalXp || 0);
 
+    const publicHabits = habits;
+
     res.json({
+      // Required fields from STEP 3
+      username:       user.name || 'StreakBoard User',
+      currentStreak:  longestStreak || user.currentStreak || 0,
+      bestStreak:     user.bestStreak || longestStreak || 0,
+      totalDone:      totalDone || user.totalDone || 0,
+      completionRate: overallRate || user.completionRate || 0,
+      habits:         publicHabits || [],
+      level:          levelData.level,
+      levelName:      levelData.name,
+
+      // Preserve existing fields for backward compatibility
       name:         user.name || 'StreakBoard User',
       avatar:       user.avatar || null,
       shareCode:    user.shareCode || null,
@@ -409,8 +423,7 @@ export const getProfileById = async (req, res) => {
       bannerColor:  user.bannerColor || null,
       pinnedBadge:  user.pinnedBadge?.icon ? user.pinnedBadge : null,
       currentLevel: levelData.level,
-      levelName:    levelData.name,
-      currentStreak: longestStreak,
+      currentStreakOriginal: longestStreak, // original name
       stats: {
         totalHabits:   habits.length,
         totalDone,
