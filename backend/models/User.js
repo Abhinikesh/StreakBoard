@@ -132,6 +132,12 @@ const userSchema = new mongoose.Schema(
       label: { type: String, default: null },
       _id:   false,
     },
+    // ── Expo push token (mobile app — for DM push notifications) ─────────────
+    expoPushToken: {
+      type:    String,
+      default: null,
+    },
+
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

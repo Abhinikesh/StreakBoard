@@ -1,11 +1,38 @@
-import Message         from '../models/Message.js';
-import Block           from '../models/Block.js';
-import User            from '../models/User.js';
+import Message          from '../models/Message.js';
+import Block            from '../models/Block.js';
+import User             from '../models/User.js';
 import PushSubscription from '../models/PushSubscription.js';
 import webpush          from 'web-push';
 import mongoose         from 'mongoose';
+import { Expo }         from 'expo-server-sdk';
 
 const { Types: { ObjectId } } = mongoose;
+const expo = new Expo();
+
+// ── Expo push helper (DM notifications) ─────────────────────────────────────
+async function sendExpoPush({ recipientId, senderName, content, senderId }) {
+  try {
+    const recipient = await User.findById(recipientId).select('expoPushToken').lean();
+    const token = recipient?.expoPushToken;
+    if (!token || !Expo.isExpoPushToken(token)) return; // no valid token — skip
+
+    const body = content.length > 80 ? content.slice(0, 77) + '…' : content;
+    await expo.sendPushNotificationsAsync([{
+      to:    token,
+      title: senderName,
+      body,
+      sound: 'default',
+      data: {
+        type:       'message',
+        senderId:   String(senderId),
+        senderName,
+      },
+    }]);
+  } catch (e) {
+    // Never let a push failure break the message send
+    console.error('[sendExpoPush] failed:', e.message);
+  }
+}
 
 async function pushTo(userId, title, body) {
   try {
@@ -119,7 +146,15 @@ export const sendMessage = async (req, res) => {
         { blockerId: receiverId, blockedId: senderId },
       ],
     });
-    if (blocked) return res.status(403).json({ message: 'Messaging is not available.' });
+    if (blocked) {
+      const recipientIsBlocker = blocked.blockerId.toString() === receiverId;
+      return res.status(403).json({
+        error:   'BLOCKED',
+        message: recipientIsBlocker
+          ? 'You have been blocked by this user.'
+          : 'You have blocked this user.',
+      });
+    }
 
     // Daily limit: 20 messages per conversation per day
     const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
@@ -131,9 +166,17 @@ export const sendMessage = async (req, res) => {
 
     const msg = await Message.create({ senderId, receiverId, content: content.trim() });
 
-    // Push to receiver
+    // Web-push (browser subscribers)
     const preview = content.trim().slice(0, 50);
     await pushTo(receiverId, `💬 ${me.name}`, `${preview}${content.length > 50 ? '...' : ''}`);
+
+    // Expo push (mobile app) — fire-and-forget, never throws
+    sendExpoPush({
+      recipientId: receiverId,
+      senderName:  me.name,
+      content:     content.trim(),
+      senderId,
+    });
 
     res.status(201).json(msg);
   } catch (err) {

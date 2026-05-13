@@ -22,3 +22,19 @@ export const uploadAvatar = async (req, res) => {
     res.status(500).json({ message: 'Upload failed', error: error.message });
   }
 };
+
+// ── PATCH /api/user/push-token ────────────────────────────────────────────────
+// Saves (or clears) the Expo push token for the authenticated user's device.
+export const savePushToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    // Allow null/empty to clear the token (e.g. on logout)
+    const expoPushToken = token?.trim() || null;
+    await User.findByIdAndUpdate(req.user.id, { expoPushToken });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[savePushToken]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+

@@ -7,8 +7,9 @@ import { useTheme } from '../context/ThemeContext';
 import StreakRulePopup from '../components/StreakRulePopup';
 
 // ─── Sort options ─────────────────────────────────────────────────────────────
+// API returns: currentStreak, overallRate, totalDone
 const SORT_OPTIONS = [
-  { key: 'longestStreak', label: '🔥 Best Streak' },
+  { key: 'currentStreak', label: '🔥 Best Streak'  },
   { key: 'overallRate',   label: '📊 Overall Rate' },
   { key: 'totalDone',     label: '✅ Total Done'   },
 ];
@@ -112,11 +113,12 @@ const AVATAR_SIZE = [72, 56, 48];
 function PodiumCard({ person, rank, isDark, onNavigate, sortKey }) {
   const idx = rank - 1;
   const isFirst = rank === 1;
-  const statValue = sortKey === 'longestStreak'
-    ? `🔥 ${person.longestStreak}`
+  // API field: currentStreak (not longestStreak), overallRate, totalDone
+  const statValue = sortKey === 'currentStreak'
+    ? `🔥 ${person.currentStreak ?? 0}`
     : sortKey === 'overallRate'
-    ? `${person.overallRate}%`
-    : `✅ ${person.totalDone}`;
+    ? `${person.overallRate ?? 0}%`
+    : `✅ ${person.totalDone ?? 0}`;
 
   return (
     <div
@@ -222,11 +224,11 @@ function ListRow({ person, rank, isDark, onNavigate }) {
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — API fields: currentStreak, overallRate, totalDone */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
-        <StatCell label="🔥 Streak" value={person.longestStreak} color="#f59e0b" isDark={isDark} />
-        <StatCell label="📊 Rate" value={`${person.overallRate}%`} color="#6366f1" isDark={isDark} />
-        <StatCell label="✅ Done" value={person.totalDone} color="#10b981" isDark={isDark} />
+        <StatCell label="🔥 Streak" value={person.currentStreak ?? 0}  color="#f59e0b" isDark={isDark} />
+        <StatCell label="📊 Rate"   value={`${person.overallRate ?? 0}%`} color="#6366f1" isDark={isDark} />
+        <StatCell label="✅ Done"   value={person.totalDone ?? 0}       color="#10b981" isDark={isDark} />
         {person.shareCode && !isYou ? (
           <button
             onClick={() => onNavigate(`/u/${person.shareCode}`)}
@@ -271,7 +273,7 @@ export default function LeaderboardPage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const [sortKey, setSortKey] = useState('longestStreak');
+  const [sortKey, setSortKey] = useState('currentStreak');  // matches API field name
 
   // Inject skeleton keyframe once
   React.useEffect(() => {

@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Habit from '../models/Habit.js';
 import HabitLog from '../models/HabitLog.js';
+import FriendRequest from '../models/FriendRequest.js';
 import { grantXp, getLevelInfo } from '../lib/xp.js';
 
 // ── POST /api/social/enable ────────────────────────────────────
@@ -128,6 +129,7 @@ export const getPublicProfile = async (req, res) => {
 
     // Return ONLY aggregate stats — no habit names, icons, logs, email, or friends
     res.json({
+      userId:      user._id,           // needed by mobile to send friend requests
       name:        user.name || 'StreakBoard User',
       avatar:      user.avatar || null,
       memberSince: user.createdAt,
@@ -434,6 +436,135 @@ export const getProfileById = async (req, res) => {
     });
   } catch (err) {
     console.error('getProfileById error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── POST /api/social/friend-requests ─────────────────────────────────────────
+export const sendFriendRequest = async (req, res) => {
+  try {
+    const fromId = req.user.id;
+    const { targetUserId } = req.body;
+    if (!targetUserId) return res.status(400).json({ message: 'targetUserId is required.' });
+    if (fromId === targetUserId) return res.status(400).json({ message: 'Cannot request yourself.' });
+    const me = await User.findById(fromId).select('friends').lean();
+    if (!me) return res.status(404).json({ message: 'User not found.' });
+    if (me.friends.some(f => f.toString() === targetUserId))
+      return res.status(409).json({ message: 'Already friends.' });
+    const target = await User.findById(targetUserId).select('_id').lean();
+    if (!target) return res.status(404).json({ message: 'Target user not found.' });
+    const request = await FriendRequest.findOneAndUpdate(
+      { from: fromId, to: targetUserId },
+      { status: 'pending' },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.status(201).json(request);
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ message: 'Request already sent.' });
+    console.error('[sendFriendRequest]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── GET /api/social/friend-requests ──────────────────────────────────────────
+export const getIncomingRequests = async (req, res) => {
+  try {
+    const requests = await FriendRequest.find({ to: req.user.id, status: 'pending' })
+      .populate('from', 'name avatar shareCode')
+      .sort({ createdAt: -1 }).lean();
+    res.json(requests);
+  } catch (err) {
+    console.error('[getIncomingRequests]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── PATCH /api/social/friend-requests/:id/accept ──────────────────────────────
+export const acceptFriendRequest = async (req, res) => {
+  try {
+    const request = await FriendRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: 'Request not found.' });
+    if (request.to.toString() !== req.user.id) return res.status(403).json({ message: 'Not authorised.' });
+    if (request.status !== 'pending') return res.status(409).json({ message: `Already ${request.status}.` });
+    request.status = 'accepted';
+    await request.save();
+    await Promise.all([
+      User.findByIdAndUpdate(request.from, { $addToSet: { friends: request.to   } }),
+      User.findByIdAndUpdate(request.to,   { $addToSet: { friends: request.from } }),
+    ]);
+    await grantXp(req.user.id, 10, 'Accepted a friend request', `friend_added_${request.from}`);
+    res.json({ message: 'Friend request accepted.', request });
+  } catch (err) {
+    console.error('[acceptFriendRequest]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── PATCH /api/social/friend-requests/:id/decline ─────────────────────────────
+export const declineFriendRequest = async (req, res) => {
+  try {
+    const request = await FriendRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: 'Request not found.' });
+    if (request.to.toString() !== req.user.id) return res.status(403).json({ message: 'Not authorised.' });
+    if (request.status !== 'pending') return res.status(409).json({ message: `Already ${request.status}.` });
+    request.status = 'declined';
+    await request.save();
+    res.json({ message: 'Request declined.', request });
+  } catch (err) {
+    console.error('[declineFriendRequest]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── DELETE /api/social/friend-requests/:id (either party can cancel) ──────────
+export const cancelFriendRequest = async (req, res) => {
+  try {
+    const request = await FriendRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: 'Request not found.' });
+    const uid = req.user.id;
+    if (request.from.toString() !== uid && request.to.toString() !== uid)
+      return res.status(403).json({ message: 'Not authorised.' });
+    await FriendRequest.deleteOne({ _id: req.params.id });
+    res.json({ message: 'Request cancelled.' });
+  } catch (err) {
+    console.error('[cancelFriendRequest]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── GET /api/social/friend-status/:userId ─────────────────────────────────────
+export const getFriendStatus = async (req, res) => {
+  try {
+    const myId = req.user.id;
+    const otherId = req.params.userId;
+    if (myId === otherId) return res.status(400).json({ status: 'own' });
+    const me = await User.findById(myId).select('friends').lean();
+    if (!me) return res.status(404).json({ message: 'Not found.' });
+    if (me.friends.some(f => f.toString() === otherId))
+      return res.json({ status: 'friends', requestId: null });
+    const sent = await FriendRequest.findOne({ from: myId, to: otherId, status: 'pending' }).lean();
+    if (sent) return res.json({ status: 'pending_sent', requestId: sent._id });
+    const recv = await FriendRequest.findOne({ from: otherId, to: myId, status: 'pending' }).lean();
+    if (recv) return res.json({ status: 'pending_received', requestId: recv._id });
+    res.json({ status: 'none', requestId: null });
+  } catch (err) {
+    console.error('[getFriendStatus]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── DELETE /api/social/friends/:userId (by userId, bidirectional) ─────────────
+export const removeFriendById = async (req, res) => {
+  try {
+    const myId = req.user.id;
+    const friendId = req.params.userId;
+    await Promise.all([
+      User.findByIdAndUpdate(myId,     { $pull: { friends: friendId } }),
+      User.findByIdAndUpdate(friendId, { $pull: { friends: myId     } }),
+    ]);
+    res.json({ message: 'Friend removed.' });
+  } catch (err) {
+    console.error('[removeFriendById]', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

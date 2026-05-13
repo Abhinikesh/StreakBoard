@@ -15,8 +15,9 @@ import shieldRoutes  from "./routes/shields.js";
 import seasonRoutes  from "./routes/seasons.js";
 import weeklyRoutes      from "./routes/weeklyChallenges.js";
 import fcRoutes          from "./routes/friendChallenges.js";
-import msgRoutes         from "./routes/messages.js";
-import weeklySummaryRoutes from "./routes/weeklySummary.js";
+import msgRoutes             from "./routes/messages.js";
+import weeklySummaryRoutes   from "./routes/weeklySummary.js";
+import friendRequestRoutes   from "./routes/friendRequests.js";
 import { ensureActiveSeason } from "./lib/seasonUtils.js";
 import { ensureCurrentChallenge } from "./lib/weeklyChallenge.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
@@ -62,9 +63,10 @@ app.use("/api/xp",            xpRoutes);
 app.use("/api/shields",       shieldRoutes);
 app.use("/api/seasons",           seasonRoutes);
 app.use("/api/weekly-challenge",  weeklyRoutes);
-app.use("/api/friend-challenges", fcRoutes);
-app.use("/api/messages",          msgRoutes);
-app.use("/api/weekly-summary",    weeklySummaryRoutes);
+app.use("/api/friend-challenges",  fcRoutes);
+app.use("/api/messages",           msgRoutes);
+app.use("/api/weekly-summary",     weeklySummaryRoutes);
+app.use("/api/friend-requests",    friendRequestRoutes);
 
 // ── Startup: ensure active season + weekly challenge ───────────────────────
 ensureActiveSeason()
