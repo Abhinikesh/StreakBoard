@@ -132,7 +132,7 @@ export const googleCallback = async (req, res) => {
     const redirectUrl = req.decodedRedirectUrl || '';
     const fallbackUrl = process.env.CLIENT_URL || 'https://streak-o.vercel.app';
 
-    const finalUrl = redirectUrl && redirectUrl.startsWith('streakboard://')
+    const finalUrl = redirectUrl && redirectUrl.startsWith('habitboard://')
       ? `${redirectUrl}?token=${token}`
       : `${fallbackUrl}/auth/callback?token=${token}`;
 
