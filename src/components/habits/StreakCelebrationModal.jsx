@@ -8,7 +8,6 @@ export default function StreakCelebrationModal({ habit, onClose }) {
     if (!habit || firedRef.current) return;
     firedRef.current = true;
 
-    // Fire confetti burst
     const fire = (particleRatio, opts) => {
       confetti({
         origin: { y: 0.6 },
