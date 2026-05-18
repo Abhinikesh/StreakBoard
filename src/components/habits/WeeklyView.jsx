@@ -31,7 +31,6 @@ export default function WeeklyView({ habits = [], allLogs = [] }) {
     } catch { return ''; }
   }, [weekStart, weekEnd]);
 
-  // Build a lookup: { "habitId_date": status }
   const logMap = useMemo(() => {
     const map = {};
     allLogs.forEach(log => {
@@ -41,7 +40,6 @@ export default function WeeklyView({ habits = [], allLogs = [] }) {
     return map;
   }, [allLogs]);
 
-  // Today's summary counts
   const { doneToday, missedToday, pendingToday } = useMemo(() => {
     let done = 0, missed = 0, pending = 0;
     habits.forEach(h => {
